@@ -15,6 +15,7 @@ pub fn run() {
             file_commands::write_markdown_file,
             file_commands::file_exists,
             file_commands::list_markdown_files_in_folder,
+            file_commands::write_html_file,
             asset_commands::save_image_asset,
             asset_commands::read_image_asset_as_data_url,
         ])

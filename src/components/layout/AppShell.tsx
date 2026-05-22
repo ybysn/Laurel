@@ -43,6 +43,8 @@ import {
   saveSettings,
   type AppSettings,
 } from "../../services/settings_service";
+import { exportMarkdownToHtml } from "../../services/export_service";
+import { writeHtmlFile } from "../../services/file_service";
 import { createLogger } from "../../services/logger";
 
 const logger = createLogger("AppShell");
@@ -432,6 +434,28 @@ export function AppShell() {
               onToggleAutoSave={() => handleSaveSettings({ ...settings, autoSaveEnabled: !settings.autoSaveEnabled })}
               onOpenSettings={() => setSettingsOpen(true)}
               onUpdateSettings={(partial) => handleSaveSettings({ ...settings, ...partial })}
+              onExportHtml={async () => {
+                try {
+                  const raw = await save({
+                    filters: [{ name: "HTML", extensions: ["html"] }],
+                    defaultPath: doc.fileName.endsWith(".md")
+                      ? doc.fileName.replace(/\.md$/, ".html")
+                      : `${doc.fileName}.html`,
+                  });
+                  const savePath = extractDialogPath(raw);
+                  if (!savePath) return;
+
+                  const html = await exportMarkdownToHtml({
+                    content: doc.content,
+                    currentPath: doc.currentPath,
+                    fileName: doc.fileName,
+                  });
+                  await writeHtmlFile(savePath, html);
+                  alert("HTML 导出成功");
+                } catch (err) {
+                  alert(`HTML 导出失败: ${err instanceof Error ? err.message : String(err)}`);
+                }
+              }}
             />
           </main>
         </div>

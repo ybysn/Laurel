@@ -219,3 +219,35 @@ pub fn list_markdown_files_in_folder(
 
     Ok(scan_dir(path_buf, path_buf, 0))
 }
+
+/// 将文本内容写入 .html 文件。
+/// 仅允许 .html / .htm 扩展名，采用先写临时文件再替换的策略。
+#[tauri::command]
+pub fn write_html_file(path: String, content: String) -> Result<(), String> {
+    let path_buf = Path::new(&path);
+
+    // 校验扩展名
+    match path_buf.extension().and_then(|e| e.to_str()) {
+        Some("html") | Some("htm") => {}
+        Some(ext) => return Err(format!("不支持的文件扩展名: .{}，仅支持 .html / .htm", ext)),
+        None => return Err("文件没有扩展名".to_string()),
+    }
+
+    // 确保父目录存在
+    if let Some(parent) = path_buf.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("创建目录失败: {}", e))?;
+        }
+    }
+
+    // 写入临时文件再替换
+    let tmp_path = path_buf.with_extension("html.tmp");
+    fs::write(&tmp_path, content.as_bytes())
+        .map_err(|e| format!("写入临时文件失败: {}", e))?;
+
+    fs::rename(&tmp_path, path_buf)
+        .map_err(|e| format!("保存文件失败: {}", e))?;
+
+    Ok(())
+}

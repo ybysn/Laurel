@@ -39,3 +39,8 @@ export async function listMarkdownFilesInFolder(
     folderPath,
   });
 }
+
+/** 将 HTML 内容写入 .html 文件 */
+export async function writeHtmlFile(path: string, content: string): Promise<void> {
+  return invoke<void>("write_html_file", { path, content });
+}

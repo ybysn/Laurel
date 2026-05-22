@@ -75,6 +75,7 @@ export interface EditorPanelProps {
   onToggleAutoSave: () => void;
   onOpenSettings: () => void;
   onUpdateSettings: (partial: { editorFontSize?: number; editorFontFamily?: string }) => void;
+  onExportHtml: () => void;
 }
 
 export interface EditorPanelHandle {
@@ -144,6 +145,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       onOpenSettings,
       defaultViewMode,
       onUpdateSettings,
+      onExportHtml,
     },
     ref,
   ) {
@@ -649,6 +651,13 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           </div>
 
           <span className="editor-toolbar__sep" />
+          <button
+            className="editor-toolbar__btn"
+            title="导出 HTML"
+            onClick={onExportHtml}
+          >
+            导出
+          </button>
           <button
             className="editor-toolbar__btn"
             title="设置"
