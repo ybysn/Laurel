@@ -28,6 +28,13 @@ import {
 import { MarkdownPreview } from "./MarkdownPreview";
 import { saveImageAsset } from "../../services/asset_service";
 import { createLogger } from "../../services/logger";
+import { FindReplaceBar } from "./FindReplaceBar";
+import {
+  findMatches,
+  replaceCurrentMatch,
+  replaceAllMatches,
+  type FindMatch,
+} from "../../editor/markdown/find_replace";
 
 const logger = createLogger("EditorPanel");
 
@@ -158,6 +165,15 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const exportMenuRef = useRef<HTMLDivElement>(null);
 
+    // ── 查找替换状态 ────────────────────────────
+    const [findQuery, setFindQuery] = useState("");
+    const [replaceText, setReplaceText] = useState("");
+    const [isFindOpen, setIsFindOpen] = useState(false);
+    const [isReplaceMode, setIsReplaceMode] = useState(false);
+    const [caseSensitive, setCaseSensitive] = useState(false);
+    const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+    const matchesRef = useRef<FindMatch[]>([]);
+
     // 点击外部关闭导出菜单
     useEffect(() => {
       if (!exportMenuOpen) return;
@@ -277,6 +293,95 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
         textarea.setSelectionRange(offset, offset);
       },
     }));
+
+    // ── 查找替换 ────────────────────────────────
+
+    const updateFindMatches = useCallback(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      matchesRef.current = findMatches(textarea.value, findQuery, { caseSensitive });
+      const maxIdx = Math.max(0, matchesRef.current.length - 1);
+      setActiveMatchIndex((prev) => Math.min(prev, maxIdx));
+    }, [findQuery, caseSensitive]);
+
+    // query 变化时更新匹配列表
+    useEffect(() => {
+      updateFindMatches();
+      setActiveMatchIndex(0);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [findQuery, caseSensitive]);
+
+    const selectMatch = useCallback((index: number) => {
+      const textarea = textareaRef.current;
+      const matches = matchesRef.current;
+      if (!textarea || matches.length === 0) return;
+      const idx = Math.max(0, Math.min(index, matches.length - 1));
+      const m = matches[idx];
+      textarea.focus();
+      textarea.setSelectionRange(m.start, m.end);
+      setActiveMatchIndex(idx);
+    }, []);
+
+    const handleFindNext = useCallback(() => {
+      const next = activeMatchIndex + 1 >= matchesRef.current.length ? 0 : activeMatchIndex + 1;
+      selectMatch(next);
+    }, [activeMatchIndex, selectMatch]);
+
+    const handleFindPrev = useCallback(() => {
+      const prev = activeMatchIndex - 1 < 0 ? matchesRef.current.length - 1 : activeMatchIndex - 1;
+      selectMatch(prev);
+    }, [activeMatchIndex, selectMatch]);
+
+    const handleReplaceCurrent = useCallback(() => {
+      const matches = matchesRef.current;
+      if (matches.length === 0) return;
+      const idx = Math.max(0, Math.min(activeMatchIndex, matches.length - 1));
+      const m = matches[idx];
+      const result = replaceCurrentMatch(content, m, replaceText);
+      onContentChange(result.content);
+      setTimeout(() => {
+        updateFindMatches();
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.setSelectionRange(result.cursorPos, result.cursorPos);
+          textarea.focus();
+        }
+      }, 0);
+    }, [content, activeMatchIndex, replaceText, onContentChange, updateFindMatches]);
+
+    const handleReplaceAll = useCallback(() => {
+      if (!findQuery) return;
+      const result = replaceAllMatches(content, findQuery, replaceText, { caseSensitive });
+      if (result.count > 0) {
+        onContentChange(result.content);
+        setTimeout(() => {
+          matchesRef.current = [];
+          setActiveMatchIndex(0);
+        }, 0);
+      }
+    }, [content, findQuery, replaceText, caseSensitive, onContentChange]);
+
+    const openFind = useCallback((replace?: boolean) => {
+      setIsFindOpen(true);
+      setIsReplaceMode(replace ?? false);
+      // 如果 textarea 有选中文本，填充到查找框
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const selected = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
+        if (selected) {
+          setFindQuery(selected);
+          return;
+        }
+      }
+    }, []);
+
+    const closeFind = useCallback(() => {
+      setIsFindOpen(false);
+      setFindQuery("");
+      setReplaceText("");
+      matchesRef.current = [];
+      setActiveMatchIndex(0);
+    }, []);
 
     // ── 编辑命令执行 ──────────────────────────
 
@@ -467,6 +572,14 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             e.preventDefault();
             applyCommand(toggleInlineCode);
             break;
+          case "f":
+            e.preventDefault();
+            openFind(false);
+            break;
+          case "h":
+            e.preventDefault();
+            openFind(true);
+            break;
           case "s":
             e.preventDefault();
             onSave();
@@ -485,7 +598,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             break;
         }
       },
-      [applyCommand, onSave, onOpen, onNew, onToggleSidebar],
+      [applyCommand, onSave, onOpen, onNew, onToggleSidebar, openFind],
     );
 
     const handlePreviewKeyDown = useCallback(
@@ -494,6 +607,14 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
         if (!ctrl) return;
 
         switch (e.key.toLowerCase()) {
+          case "f":
+            e.preventDefault();
+            openFind(false);
+            break;
+          case "h":
+            e.preventDefault();
+            openFind(true);
+            break;
           case "s":
             e.preventDefault();
             onSave();
@@ -512,7 +633,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             break;
         }
       },
-      [onSave, onOpen, onNew, onToggleSidebar],
+      [onSave, onOpen, onNew, onToggleSidebar, openFind],
     );
 
     // ── 统计 ────────────────────────────────────
@@ -711,6 +832,24 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
         </div>
 
         {/* 状态消息 */}
+        {isFindOpen && (
+          <FindReplaceBar
+            query={findQuery}
+            replaceText={replaceText}
+            caseSensitive={caseSensitive}
+            matchCount={matchesRef.current.length}
+            activeIndex={activeMatchIndex}
+            isReplaceMode={isReplaceMode}
+            onQueryChange={setFindQuery}
+            onReplaceTextChange={setReplaceText}
+            onNext={handleFindNext}
+            onPrev={handleFindPrev}
+            onReplaceCurrent={handleReplaceCurrent}
+            onReplaceAll={handleReplaceAll}
+            onToggleCaseSensitive={() => setCaseSensitive((p) => !p)}
+            onClose={closeFind}
+          />
+        )}
         {statusMessage && (
           <div className="editor-status-msg">{statusMessage}</div>
         )}
