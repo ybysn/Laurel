@@ -546,6 +546,19 @@ body {
   flex: 1;
 }
 
+/* 预览查找高亮 */
+.preview-find-match {
+  background: rgba(255, 214, 102, 0.55);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.preview-find-match.active {
+  background: #4f7cff;
+  color: #fff;
+}
+
 .editor-empty-state {
   display: flex;
   flex-direction: column;

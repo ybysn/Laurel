@@ -317,6 +317,16 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       if (!textarea || matches.length === 0) return;
       const idx = Math.max(0, Math.min(index, matches.length - 1));
       const m = matches[idx];
+
+      // 滚动 textarea 到匹配行附近
+      const textBefore = textarea.value.slice(0, m.start);
+      const lineIndex = textBefore.split("\n").length - 1;
+      const computed = window.getComputedStyle(textarea);
+      const lineHeight = parseFloat(computed.lineHeight) || parseFloat(computed.fontSize) * 1.6;
+      const paddingTop = parseFloat(computed.paddingTop) || 0;
+      const targetTop = Math.max(0, lineIndex * lineHeight - textarea.clientHeight * 0.35 + paddingTop);
+
+      textarea.scrollTop = targetTop;
       textarea.focus();
       textarea.setSelectionRange(m.start, m.end);
       setActiveMatchIndex(idx);
@@ -874,7 +884,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <MarkdownPreview content={content} currentPath={currentPath} onKeyDown={handlePreviewKeyDown} />
+            <MarkdownPreview content={content} currentPath={currentPath} onKeyDown={handlePreviewKeyDown} findQuery={findQuery} activeMatchIndex={activeMatchIndex} caseSensitive={caseSensitive} enableFindHighlight={isFindOpen} />
           </div>
         )}
 
@@ -891,7 +901,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             </div>
             <div className="editor-split__divider" />
             <div className="editor-split__pane editor-split__pane--preview">
-              <MarkdownPreview content={content} currentPath={currentPath} />
+              <MarkdownPreview content={content} currentPath={currentPath} findQuery={findQuery} activeMatchIndex={activeMatchIndex} caseSensitive={caseSensitive} enableFindHighlight={isFindOpen} />
             </div>
           </div>
         )}

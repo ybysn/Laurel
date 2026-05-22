@@ -1,8 +1,5 @@
 /**
- * 模块职责：Markdown 预览组件，异步加载本地图片为 data URL 后渲染。
- * 当前输入：content、currentPath、可选的 className、onKeyDown。
- * 当前输出：渲染后的 HTML，本地图片使用 data URL。
- * 性能优化：debounce 渲染、全局 data URL 缓存、异步任务取消。
+ * 模块职责：Markdown 预览组件，支持查找高亮。
  */
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
@@ -21,94 +18,138 @@ export interface MarkdownPreviewProps {
   currentPath?: string | null;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent) => void;
+  /** 查找高亮 */
+  findQuery?: string;
+  activeMatchIndex?: number;
+  caseSensitive?: boolean;
+  enableFindHighlight?: boolean;
 }
 
-/** 模块级 data URL 缓存，避免重复读取同一文件 */
 const globalDataUrlCache = new Map<string, string>();
+
+/** 在容器文本节点中高亮查找关键词 */
+function highlightFindMatches(
+  container: HTMLElement,
+  query: string,
+  caseSensitive: boolean,
+  activeIndex: number,
+) {
+  // 清除旧高亮
+  container.querySelectorAll("mark.preview-find-match").forEach((m) => {
+    const parent = m.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(m.textContent ?? ""), m);
+      parent.normalize();
+    }
+  });
+
+  if (!query) return;
+
+  const target = caseSensitive ? query : query.toLowerCase();
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    if (node.parentElement?.closest("script,style,pre,code")) continue;
+    textNodes.push(node);
+  }
+
+  let globalIdx = 0;
+  for (const node of textNodes) {
+    const text = node.textContent ?? "";
+    const source = caseSensitive ? text : text.toLowerCase();
+    if (!source.includes(target)) continue;
+
+    const fragment = document.createDocumentFragment();
+    let remaining = text;
+    let pos = 0;
+
+    while (pos < source.length) {
+      const idx = source.indexOf(target, pos);
+      if (idx === -1) {
+        fragment.appendChild(document.createTextNode(remaining.slice(idx - remaining.indexOf(remaining))));
+        // append rest
+        const restStart = pos;
+        if (restStart < text.length) {
+          fragment.appendChild(document.createTextNode(text.slice(restStart)));
+        }
+        break;
+      }
+      // text before match
+      if (idx > pos) {
+        fragment.appendChild(document.createTextNode(text.slice(pos, idx)));
+      }
+      // match
+      const mark = document.createElement("mark");
+      mark.className = "preview-find-match";
+      if (globalIdx === activeIndex) {
+        mark.classList.add("active");
+      }
+      mark.textContent = text.slice(idx, idx + target.length);
+      fragment.appendChild(mark);
+      pos = idx + target.length;
+      globalIdx++;
+    }
+    node.parentNode?.replaceChild(fragment, node);
+  }
+
+  // 滚动到 active match
+  const active = container.querySelector(".preview-find-match.active") as HTMLElement | null;
+  if (active) {
+    active.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+}
 
 export function MarkdownPreview({
   content,
   currentPath,
   className,
   onKeyDown,
+  findQuery,
+  activeMatchIndex = 0,
+  caseSensitive = false,
+  enableFindHighlight = false,
 }: MarkdownPreviewProps) {
   const [imageSrcMap, setImageSrcMap] = useState<Record<string, string>>({});
   const versionRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // content / currentPath 变化时 debounce 后加载图片
   useEffect(() => {
-    if (!currentPath) {
-      setImageSrcMap({});
-      return;
-    }
-
-    // debounce 300ms
+    if (!currentPath) { setImageSrcMap({}); return; }
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-
     debounceTimerRef.current = setTimeout(() => {
       let cancelled = false;
       const version = ++versionRef.current;
       const sources = extractMarkdownImageSources(content);
       const nextMap: Record<string, string> = {};
-
-      if (sources.length === 0) {
-        setImageSrcMap({});
-        return;
-      }
-
-      console.time("[PERF] preview image data url loading");
-
+      if (sources.length === 0) { setImageSrcMap({}); return; }
       Promise.all(
         sources.map(async (rawSrc) => {
           if (cancelled || version !== versionRef.current) return null;
-
           const decodedSrc = safeDecodeMarkdownImageSrc(rawSrc);
           const resolvedPath = resolveMarkdownAssetPath(currentPath, decodedSrc);
-
-          // 优先查全局缓存
           const cached = globalDataUrlCache.get(resolvedPath);
-          if (cached) {
-            return { rawSrc, decodedSrc, dataUrl: cached };
-          }
-
+          if (cached) return { rawSrc, decodedSrc, dataUrl: cached };
           try {
             const dataUrl = await readImageAssetAsDataUrl(resolvedPath);
             globalDataUrlCache.set(resolvedPath, dataUrl);
             return { rawSrc, decodedSrc, dataUrl };
-          } catch {
-            return null;
-          }
+          } catch { return null; }
         }),
       ).then((results) => {
         if (cancelled || version !== versionRef.current) return;
-
         for (const r of results) {
           if (!r?.dataUrl) continue;
-          const keys = new Set([
-            r.rawSrc,
-            r.decodedSrc,
-            normalizeMarkdownImageSrc(r.rawSrc),
-            normalizeMarkdownImageSrc(r.decodedSrc),
-          ]);
-          for (const key of keys) {
-            if (key) nextMap[key] = r.dataUrl;
-          }
+          const keys = new Set([r.rawSrc, r.decodedSrc, normalizeMarkdownImageSrc(r.rawSrc), normalizeMarkdownImageSrc(r.decodedSrc)]);
+          for (const key of keys) { if (key) nextMap[key] = r.dataUrl; }
         }
-
-        console.timeEnd("[PERF] preview image data url loading");
         setImageSrcMap(nextMap);
       });
-
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }, 300);
-
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      versionRef.current++; // 加速旧任务被取消
-    };
+    return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); versionRef.current++; };
   }, [content, currentPath]);
 
   const html = useMemo(
@@ -116,8 +157,28 @@ export function MarkdownPreview({
     [content, currentPath, imageSrcMap],
   );
 
+  // 查找高亮 effect（debounce 100ms）
+  useEffect(() => {
+    if (!enableFindHighlight || !findQuery || !containerRef.current) return;
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => {
+      if (containerRef.current) {
+        highlightFindMatches(containerRef.current, findQuery, caseSensitive, activeMatchIndex);
+      }
+    }, 100);
+    return () => { if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current); };
+  }, [html, findQuery, activeMatchIndex, caseSensitive, enableFindHighlight]);
+
+  // 清理高亮定时器
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
+
   return (
     <div
+      ref={containerRef}
       className={`markdown-preview ${className ?? ""}`}
       dangerouslySetInnerHTML={{ __html: html }}
       onKeyDown={onKeyDown}
