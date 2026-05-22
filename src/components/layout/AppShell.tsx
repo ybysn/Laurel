@@ -1,25 +1,47 @@
 /**
  * 模块职责：主布局壳组件，管理文档状态并向下分发文件操作与编辑器内容。
  * 当前输入：无（顶层组件）。
- * 当前输出：三栏布局，文件树/编辑器/大纲，以及文件操作能力。
+ * 当前输出：三栏布局，文件树/编辑器/大纲（含标题跳转），以及文件操作能力。
  * 后续扩展点：快捷键绑定、自动保存、关闭未保存确认。
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { FileTreePanel } from "../file_tree/FileTreePanel";
-import { EditorPanel } from "../editor/EditorPanel";
+import {
+  EditorPanel,
+  type EditorPanelHandle,
+} from "../editor/EditorPanel";
 import { OutlinePanel } from "../outline/OutlinePanel";
 import { readMarkdownFile, writeMarkdownFile } from "../../services/file_service";
 import {
   type DocumentState,
+  type DocumentStats,
   createEmptyDocument,
+  getDocumentStats,
 } from "../../app/document_state";
+import {
+  parseMarkdownOutline,
+  type MarkdownOutlineItem,
+} from "../../editor/markdown/parse_outline";
 
 export function AppShell() {
   const [doc, setDoc] = useState<DocumentState>(createEmptyDocument);
+  const editorRef = useRef<EditorPanelHandle>(null);
+
+  // 实时计算大纲和统计
+  const outlineResult = useMemo(() => {
+    const items = parseMarkdownOutline(doc.content);
+    const stats = getDocumentStats(doc.content, items.length);
+    return { items, stats } as { items: MarkdownOutlineItem[]; stats: DocumentStats };
+  }, [doc.content]);
 
   const setContent = useCallback((content: string) => {
     setDoc((prev) => ({ ...prev, content, isDirty: true }));
+  }, []);
+
+  /** 点击大纲条目时滚动编辑器到对应标题行 */
+  const handleSelectOutlineItem = useCallback((item: MarkdownOutlineItem) => {
+    editorRef.current?.scrollToLine(item.line);
   }, []);
 
   const handleNew = useCallback(() => {
@@ -124,6 +146,7 @@ export function AppShell() {
       </aside>
       <main className="app-shell__main">
         <EditorPanel
+          ref={editorRef}
           content={doc.content}
           fileName={doc.fileName}
           isDirty={doc.isDirty}
@@ -132,7 +155,12 @@ export function AppShell() {
         />
       </main>
       <aside className="app-shell__sidebar app-shell__sidebar--right">
-        <OutlinePanel />
+        <OutlinePanel
+          outlineItems={outlineResult.items}
+          stats={outlineResult.stats}
+          isEditing={doc.isEditing}
+          onSelectOutlineItem={handleSelectOutlineItem}
+        />
       </aside>
     </div>
   );
