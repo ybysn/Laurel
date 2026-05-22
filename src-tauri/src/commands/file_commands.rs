@@ -6,6 +6,7 @@
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 /// 读取 Markdown 文件后返回的负载结构。
 #[derive(Serialize, Clone)]
@@ -248,6 +249,83 @@ pub fn write_html_file(path: String, content: String) -> Result<(), String> {
 
     fs::rename(&tmp_path, path_buf)
         .map_err(|e| format!("保存文件失败: {}", e))?;
+
+    Ok(())
+}
+
+/// 在 Windows 上查找 Edge 或 Chrome 的可执行文件路径。
+fn find_browser() -> Option<String> {
+    let candidates = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ];
+    for candidate in &candidates {
+        if Path::new(candidate).exists() {
+            return Some(candidate.to_string());
+        }
+    }
+    None
+}
+
+/// 将 HTML 内容直接导出为 PDF。
+/// 通过调用 Edge/Chrome headless --print-to-pdf 实现，不弹打印窗口。
+#[tauri::command]
+pub fn export_html_to_pdf(html: String, output_path: String) -> Result<(), String> {
+    let pdf_path = Path::new(&output_path);
+
+    // 校验扩展名
+    match pdf_path.extension().and_then(|e| e.to_str()) {
+        Some("pdf") => {}
+        Some(ext) => return Err(format!("不支持的文件扩展名: .{}，仅支持 .pdf", ext)),
+        None => return Err("文件没有扩展名".to_string()),
+    }
+
+    // 确保父目录存在
+    if let Some(parent) = pdf_path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("创建目录失败: {}", e))?;
+        }
+    }
+
+    // 查找浏览器
+    let browser = find_browser()
+        .ok_or_else(|| "未找到可用的 Edge 或 Chrome 浏览器，无法直接导出 PDF。请安装 Edge 或 Chrome 后重试。".to_string())?;
+
+    // 写入临时 HTML
+    let tmp_html = pdf_path.with_extension("pdf.tmp.html");
+    fs::write(&tmp_html, html.as_bytes())
+        .map_err(|e| format!("写入临时 HTML 失败: {}", e))?;
+
+    // 调用 headless 生成 PDF
+    let status = Command::new(&browser)
+        .args([
+            "--headless=new",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--print-to-pdf-no-header",
+            &format!("--print-to-pdf={}", output_path),
+        ])
+        .arg(&tmp_html)
+        .status()
+        .map_err(|e| format!("启动浏览器失败 ({}): {}", browser, e))?;
+
+    // 清理临时 HTML
+    let _ = fs::remove_file(&tmp_html);
+
+    if !status.success() {
+        return Err(format!(
+            "浏览器进程异常退出 (code: {})，PDF 生成失败",
+            status.code().unwrap_or(-1)
+        ));
+    }
+
+    // 验证 PDF 是否生成
+    if !pdf_path.exists() {
+        return Err("PDF 文件未生成，浏览器可能不支持 --print-to-pdf".to_string());
+    }
 
     Ok(())
 }

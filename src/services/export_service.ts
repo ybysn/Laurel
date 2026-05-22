@@ -115,3 +115,75 @@ ${bodyHtml}
 </body>
 </html>`;
 }
+
+const PRINT_CSS = `
+@page { size: A4; margin: 18mm 16mm; }
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #111827;
+  background: #ffffff;
+}
+main.markdown-body { max-width: none; margin: 0; padding: 0; }
+h1, h2, h3 { page-break-after: avoid; break-after: avoid; font-weight: 600; }
+h1 { font-size: 1.6em; border-bottom: 1px solid #d1d5db; padding-bottom: 0.3em; }
+h2 { font-size: 1.35em; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25em; }
+h3 { font-size: 1.15em; }
+pre, table, blockquote, img { break-inside: avoid; }
+code { font-family: Consolas, "Courier New", monospace; }
+pre { padding: 12px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
+blockquote { margin: 0.5em 0; padding: 0.5em 1em; border-left: 3px solid #4a7cf7; color: #4b5563; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 5px 10px; border: 1px solid #d1d5db; text-align: left; }
+th { background: #f3f4f6; font-weight: 600; }
+img { max-width: 100%; height: auto; display: block; margin: 12px 0; }
+a { color: #4a7cf7; }
+p { margin-bottom: 0.6em; }
+ul, ol { padding-left: 1.5em; }
+`.trim();
+
+export async function buildPrintableHtml(
+  options: ExportHtmlOptions,
+): Promise<string> {
+  const { content, currentPath, fileName } = options;
+  const title = getExportTitle(fileName);
+
+  const imageSrcMap: Record<string, string> = {};
+  if (currentPath) {
+    const sources = extractMarkdownImageSources(content);
+    const results = await Promise.all(
+      sources.map(async (src) => {
+        try {
+          const decodedSrc = safeDecodeMarkdownImageSrc(src);
+          const absolute = resolveMarkdownAssetPath(currentPath, decodedSrc);
+          const dataUrl = await readImageAssetAsDataUrl(absolute);
+          return { src, dataUrl } as const;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const r of results) {
+      if (r) imageSrcMap[r.src] = r.dataUrl;
+    }
+  }
+
+  const bodyHtml = renderMarkdownToHtml(content, currentPath ?? null, imageSrcMap);
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>${title}</title>
+  <style>${PRINT_CSS}</style>
+</head>
+<body>
+  <main class="markdown-body">
+${bodyHtml}
+  </main>
+</body>
+</html>`;
+}

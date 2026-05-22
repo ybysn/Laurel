@@ -44,3 +44,8 @@ export async function listMarkdownFilesInFolder(
 export async function writeHtmlFile(path: string, content: string): Promise<void> {
   return invoke<void>("write_html_file", { path, content });
 }
+
+/** 将 HTML 内容直接导出为 PDF（调用 Edge/Chrome headless） */
+export async function exportHtmlToPdf(html: string, outputPath: string): Promise<void> {
+  return invoke<void>("export_html_to_pdf", { html, outputPath });
+}

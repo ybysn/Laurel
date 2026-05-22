@@ -43,9 +43,9 @@ import {
   saveSettings,
   type AppSettings,
 } from "../../services/settings_service";
-import { exportMarkdownToHtml } from "../../services/export_service";
+import { exportMarkdownToHtml, buildPrintableHtml } from "../../services/export_service";
 import { printMarkdownDocument } from "../../services/print_service";
-import { writeHtmlFile } from "../../services/file_service";
+import { writeHtmlFile, exportHtmlToPdf } from "../../services/file_service";
 import { createLogger } from "../../services/logger";
 
 const logger = createLogger("AppShell");
@@ -458,13 +458,23 @@ export function AppShell() {
                 }
               }}
               onExportPdf={async () => {
-                alert("PDF 导出将打开系统打印窗口，请选择'另存为 PDF'。");
                 try {
-                  await printMarkdownDocument({
+                  const raw = await save({
+                    filters: [{ name: "PDF", extensions: ["pdf"] }],
+                    defaultPath: doc.fileName.endsWith(".md")
+                      ? doc.fileName.replace(/\.md$/, ".pdf")
+                      : `${doc.fileName}.pdf`,
+                  });
+                  const savePath = extractDialogPath(raw);
+                  if (!savePath) return;
+
+                  const html = await buildPrintableHtml({
                     content: doc.content,
                     currentPath: doc.currentPath,
                     fileName: doc.fileName,
                   });
+                  await exportHtmlToPdf(html, savePath);
+                  alert("PDF 导出成功");
                 } catch (err) {
                   alert(`PDF 导出失败: ${err instanceof Error ? err.message : String(err)}`);
                 }
