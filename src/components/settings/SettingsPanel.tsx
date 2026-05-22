@@ -94,10 +94,10 @@ export function SettingsPanel({ open, settings, onSave, onCancel }: SettingsPane
           <label className="settings-field">
             <span className="settings-field__label">默认打开模式</span>
             <select className="settings-field__input" value={form.defaultViewMode}
-              onChange={(e) => set("defaultViewMode", e.target.value as "edit" | "preview" | "split")}>
-              <option value="edit">编辑</option>
-              <option value="preview">预览</option>
-              <option value="split">分屏</option>
+              onChange={(e) =>                 set("defaultViewMode", e.target.value as "wysiwyg" | "source" | "split")}>
+              <option value="wysiwyg">写作模式</option>
+              <option value="source">源码模式</option>
+              <option value="split">分屏模式</option>
             </select>
           </label>
 

@@ -12,7 +12,7 @@ export interface AppSettings {
   theme: "light" | "dark";
   editorFontSize: number;
   editorFontFamily: string;
-  defaultViewMode: "edit" | "preview" | "split";
+  defaultViewMode: "wysiwyg" | "source" | "split";
   sidebarVisibleByDefault: boolean;
 }
 
@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: "light",
   editorFontSize: 16,
   editorFontFamily: "Consolas, 'Microsoft YaHei', monospace",
-  defaultViewMode: "edit",
+  defaultViewMode: "wysiwyg",
   sidebarVisibleByDefault: true,
 };
 

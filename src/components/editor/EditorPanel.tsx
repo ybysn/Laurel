@@ -29,6 +29,7 @@ import { MarkdownPreview } from "./MarkdownPreview";
 import { saveImageAsset } from "../../services/asset_service";
 import { createLogger } from "../../services/logger";
 import { FindReplaceBar } from "./FindReplaceBar";
+import { TyporaEditorPanel } from "./TyporaEditorPanel";
 import {
   findMatches,
   replaceCurrentMatch,
@@ -38,7 +39,7 @@ import {
 
 const logger = createLogger("EditorPanel");
 
-export type ViewMode = "edit" | "preview" | "split";
+export type ViewMode = "wysiwyg" | "source" | "split";
 
 /** 允许的图片 MIME 类型 */
 const IMAGE_MIME_TYPES = new Set([
@@ -73,7 +74,7 @@ export interface EditorPanelProps {
   autoSaveStatus: "idle" | "saving" | "error";
   editorFontSize: number;
   editorFontFamily: string;
-  defaultViewMode: "edit" | "preview" | "split";
+  defaultViewMode: "wysiwyg" | "source" | "split";
   onContentChange: (content: string) => void;
   onSave: () => void;
   onOpen: () => void;
@@ -89,6 +90,7 @@ export interface EditorPanelProps {
 
 export interface EditorPanelHandle {
   scrollToLine: (line: number) => void;
+  scrollToHeadingText: (text: string) => void;
 }
 
 interface PendingSelection {
@@ -97,8 +99,8 @@ interface PendingSelection {
 }
 
 const VIEW_MODE_OPTIONS: { value: ViewMode; label: string }[] = [
-  { value: "edit", label: "编辑" },
-  { value: "preview", label: "预览" },
+  { value: "wysiwyg", label: "写作模式" },
+  { value: "source", label: "源码" },
   { value: "split", label: "分屏" },
 ];
 
@@ -173,6 +175,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
     const [caseSensitive, setCaseSensitive] = useState(false);
     const [activeMatchIndex, setActiveMatchIndex] = useState(0);
     const matchesRef = useRef<FindMatch[]>([]);
+    const [outlineScrollTarget, setOutlineScrollTarget] = useState<string | null>(null);
 
     // 点击外部关闭导出菜单
     useEffect(() => {
@@ -250,7 +253,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
     // 打开文件/新建文档后自动聚焦 textarea
     useEffect(() => {
       if (!isEditing) return;
-      if (viewMode === "preview") return;
+      if (viewMode === "wysiwyg") return; // WYSIWYG doesn't have textarea
 
       const textarea = textareaRef.current;
       if (!textarea) return;
@@ -291,6 +294,11 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
 
         textarea.focus();
         textarea.setSelectionRange(offset, offset);
+      },
+      scrollToHeadingText(text: string) {
+        setOutlineScrollTarget(text);
+        // 清除以便后续重复点击同一标题也能触发
+        setTimeout(() => setOutlineScrollTarget(null), 200);
       },
     }));
 
@@ -392,6 +400,19 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       matchesRef.current = [];
       setActiveMatchIndex(0);
     }, []);
+
+    // 写作模式下全局 Ctrl+\ 切换侧边栏
+    useEffect(() => {
+      if (viewMode !== "wysiwyg") return;
+      const handler = (e: KeyboardEvent) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
+          e.preventDefault();
+          onToggleSidebar();
+        }
+      };
+      window.addEventListener("keydown", handler);
+      return () => window.removeEventListener("keydown", handler);
+    }, [viewMode, onToggleSidebar]);
 
     // ── 编辑命令执行 ──────────────────────────
 
@@ -611,41 +632,6 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       [applyCommand, onSave, onOpen, onNew, onToggleSidebar, openFind],
     );
 
-    const handlePreviewKeyDown = useCallback(
-      (e: React.KeyboardEvent) => {
-        const ctrl = e.ctrlKey || e.metaKey;
-        if (!ctrl) return;
-
-        switch (e.key.toLowerCase()) {
-          case "f":
-            e.preventDefault();
-            openFind(false);
-            break;
-          case "h":
-            e.preventDefault();
-            openFind(true);
-            break;
-          case "s":
-            e.preventDefault();
-            onSave();
-            break;
-          case "o":
-            e.preventDefault();
-            onOpen();
-            break;
-          case "n":
-            e.preventDefault();
-            onNew();
-            break;
-          case "\\":
-            e.preventDefault();
-            onToggleSidebar();
-            break;
-        }
-      },
-      [onSave, onOpen, onNew, onToggleSidebar, openFind],
-    );
-
     // ── 统计 ────────────────────────────────────
 
     const charCount = content.length;
@@ -717,45 +703,28 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
         />
 
         <div className="editor-toolbar">
-          <button
-            className="editor-toolbar__btn"
-            title="切换侧边栏 (Ctrl+\)"
-            onClick={onToggleSidebar}
-          >
-            &#9776;
-          </button>
+          <button className="editor-toolbar__btn" title="切换侧边栏 (Ctrl+\)" onClick={onToggleSidebar}>&#9776;</button>
           <span className="editor-toolbar__sep" />
-          <select
-            className="editor-toolbar__select editor-toolbar__select--heading"
-            title="标题级别"
-            onChange={(e) => {
-              const level = Number(e.target.value);
-              applyCommand(setHeadingLevel, level);
-              e.target.value = ""; // 重置为默认空选项
-            }}
-            defaultValue=""
-          >
-            <option value="" disabled>
-              标题
-            </option>
-            {HEADING_OPTIONS.map((opt) => (
-              <option key={opt.level} value={opt.level}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <span className="editor-toolbar__sep" />
-          <button className="editor-toolbar__btn" title="加粗 (Ctrl+B)" onClick={() => applyCommand(toggleBold)}><strong>B</strong></button>
-          <button className="editor-toolbar__btn" title="斜体 (Ctrl+I)" onClick={() => applyCommand(toggleItalic)}><em>I</em></button>
-          <button className="editor-toolbar__btn" title="行内代码 (Ctrl+E)" onClick={() => applyCommand(toggleInlineCode)}>{"</>"}</button>
-          <span className="editor-toolbar__sep" />
-          <button className="editor-toolbar__btn" title="引用" onClick={() => applyCommand(toggleBlockquote)}>&ldquo;</button>
-          <button className="editor-toolbar__btn" title="无序列表" onClick={() => applyCommand(toggleUnorderedList)}>&bull;</button>
-          <button className="editor-toolbar__btn" title="有序列表" onClick={() => applyCommand(toggleOrderedList)}>1.</button>
-          <span className="editor-toolbar__sep" />
-          <button className="editor-toolbar__btn" title="代码块" onClick={() => applyCommand(insertCodeBlock)}>{"{ }"}</button>
-          <button className="editor-toolbar__btn" title="链接" onClick={() => applyCommand(insertLink)}>&#128279;</button>
-          <button className="editor-toolbar__btn" title="插入图片" onClick={handleImageButtonClick}>&#128247;</button>
+          {viewMode !== "wysiwyg" && (
+            <>
+              <select className="editor-toolbar__select editor-toolbar__select--heading" title="标题级别" onChange={(e) => { const level = Number(e.target.value); applyCommand(setHeadingLevel, level); e.target.value = ""; }} defaultValue="">
+                <option value="" disabled>标题</option>
+                {HEADING_OPTIONS.map((opt) => (<option key={opt.level} value={opt.level}>{opt.label}</option>))}
+              </select>
+              <span className="editor-toolbar__sep" />
+              <button className="editor-toolbar__btn" title="加粗 (Ctrl+B)" onClick={() => applyCommand(toggleBold)}><strong>B</strong></button>
+              <button className="editor-toolbar__btn" title="斜体 (Ctrl+I)" onClick={() => applyCommand(toggleItalic)}><em>I</em></button>
+              <button className="editor-toolbar__btn" title="行内代码 (Ctrl+E)" onClick={() => applyCommand(toggleInlineCode)}>{"</>"}</button>
+              <span className="editor-toolbar__sep" />
+              <button className="editor-toolbar__btn" title="引用" onClick={() => applyCommand(toggleBlockquote)}>&ldquo;</button>
+              <button className="editor-toolbar__btn" title="无序列表" onClick={() => applyCommand(toggleUnorderedList)}>&bull;</button>
+              <button className="editor-toolbar__btn" title="有序列表" onClick={() => applyCommand(toggleOrderedList)}>1.</button>
+              <span className="editor-toolbar__sep" />
+              <button className="editor-toolbar__btn" title="代码块" onClick={() => applyCommand(insertCodeBlock)}>{"{ }"}</button>
+              <button className="editor-toolbar__btn" title="链接" onClick={() => applyCommand(insertLink)}>&#128279;</button>
+              <button className="editor-toolbar__btn" title="插入图片" onClick={handleImageButtonClick}>&#128247;</button>
+            </>
+          )}
 
           <span className="editor-toolbar__spacer" />
 
@@ -865,7 +834,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
         )}
 
         {/* 编辑模式 */}
-        {viewMode === "edit" && (
+        {viewMode === "source" && (
           <div
             className="panel__body panel__body--editor-editing"
             onDragOver={handleDragOver}
@@ -876,15 +845,17 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           </div>
         )}
 
-        {/* 预览模式 */}
-        {viewMode === "preview" && (
-          <div
-            className="panel__body panel__body--editor-editing"
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <MarkdownPreview content={content} currentPath={currentPath} onKeyDown={handlePreviewKeyDown} findQuery={findQuery} activeMatchIndex={activeMatchIndex} caseSensitive={caseSensitive} enableFindHighlight={isFindOpen} />
+        {/* 写作模式 */}
+        {viewMode === "wysiwyg" && (
+          <div className="panel__body panel__body--editor-editing">
+            <TyporaEditorPanel
+              content={content}
+              currentPath={currentPath}
+              fontFamily={editorFontFamily}
+              fontSize={editorFontSize}
+              onChange={onContentChange}
+              scrollToHeadingText={outlineScrollTarget}
+            />
           </div>
         )}
 

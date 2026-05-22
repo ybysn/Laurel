@@ -1,6 +1,6 @@
 # Preview Test Cases
 
-#### ******``*****## H2 - 二级标题*****``******
+#### **`*****## H2 - 二级标题*****`**
 
 ### H3 - 三级标题333
 
@@ -18,10 +18,13 @@ Another paragraph here.三
 
 ### Unordered
 
-- First item
-- Second item
-  - Nested item
-- Third item
+* First item
+
+* Second item
+
+  * Nested item
+
+* Third item
 
 ### Ordered
 
@@ -32,7 +35,7 @@ Another paragraph here.三
 ## Table
 
 | Name  | Type   | Description    |
-|-------|--------|--------------- |
+| ----- | ------ | -------------- |
 | title | string | Document title |
 | count | number | Item count     |
 | done  | bool   | is completed   |
@@ -52,15 +55,15 @@ function greet(user: User): string {
 
 ## Links
 
-Visit [GitHub](https://github.com) or https://example.com for more info.
+Visit [GitHub](https://github.com) or <https://example.com> for more info.
 
 ## Image
 
-![Test Image](./test.png)
+![1.00](blob:http://localhost:1420/9a8be2d4-6a47-4fad-9292-3616900e9974)
 
 ## Horizontal Rule
 
----
+***
 
 ## HTML Sanity Check
 

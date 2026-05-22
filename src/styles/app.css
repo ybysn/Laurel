@@ -546,6 +546,32 @@ body {
   flex: 1;
 }
 
+/* 所见即所得编辑器 */
+.typora-editor {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.typora-editor .milkdown,
+.typora-editor .editor {
+  min-height: 100%;
+}
+
+.typora-editor .milkdown .editor[contenteditable] {
+  padding: 28px 32px;
+  max-width: 860px;
+  margin: 0 auto;
+  outline: none;
+  line-height: 1.75;
+}
+
+.typora-editor .milkdown-menu-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 /* 预览查找高亮 */
 .preview-find-match {
   background: rgba(255, 214, 102, 0.55);

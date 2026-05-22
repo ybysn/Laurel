@@ -139,6 +139,7 @@ export function AppShell() {
 
   const handleSelectOutlineItem = useCallback((item: MarkdownOutlineItem) => {
     editorRef.current?.scrollToLine(item.line);
+    editorRef.current?.scrollToHeadingText(item.text);
   }, []);
 
   // ── 设置保存 ──────────────────────────────────
