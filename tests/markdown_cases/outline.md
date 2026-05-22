@@ -35,7 +35,24 @@ Normal text here.
 
 ### 
 
-(empty heading above should not appear, and this line is just separator text)
-# 一级标题
-# pnpm tauri dev
+(empty heading above should not appear)
 
+# 普通标题
+
+## **加粗标题**
+
+### `代码标题`
+
+#### [链接标题](https://example.com)
+
+##### 标题 #####
+
+## ***加粗斜体标题***
+
+### ~~删除线标题~~
+
+## _下划线斜体标题_
+
+### ![图片alt](image.png) 图片标题
+
+## 混合 **加粗** 和 `代码` 标题

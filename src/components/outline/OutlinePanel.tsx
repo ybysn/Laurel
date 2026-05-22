@@ -1,8 +1,7 @@
 /**
  * 模块职责：大纲面板，展示文档标题层级结构，支持点击跳转。
- * 当前输入：outlineItems（标题列表）、isEditing（是否编辑中）、onSelectOutlineItem（点击回调）。
- * 当前输出：缩进标题列表、行号。
- * 后续扩展点：标题折叠/展开、高亮当前滚动位置。
+ * 当前输入：outlineItems（标题列表）、isEditing、onSelectOutlineItem。
+ * 当前输出：按级别缩进 + 样式的标题列表，纯文本展示。
  */
 import { type MarkdownOutlineItem } from "../../editor/markdown/parse_outline";
 
@@ -30,22 +29,19 @@ export function OutlinePanel({
             {!isEditing ? "请打开 Markdown 文件以查看大纲" : "暂无标题"}
           </div>
         ) : (
-          <ul className="outline-list">
+          <div className="outline-list">
             {outlineItems.map((item) => (
-              <li
+              <button
                 key={item.id}
-                className="outline-list__item"
-                style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
+                className={`outline-item outline-item--h${item.level}`}
                 onClick={() => onSelectOutlineItem(item)}
+                title={item.text}
               >
-                <span className={`outline-list__marker outline-list__marker--h${item.level}`}>
-                  {"#".repeat(item.level)}
-                </span>
-                <span className="outline-list__text">{item.text}</span>
-                <span className="outline-list__line">{item.line}</span>
-              </li>
+                <span className="outline-item__text">{item.text}</span>
+                <span className="outline-item__line">{item.line}</span>
+              </button>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>

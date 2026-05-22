@@ -1,36 +1,54 @@
 /**
  * 模块职责：从 Markdown 文本中提取 ATX 标题，生成大纲条目列表。
  * 输入：Markdown 原始文本。
- * 输出：MarkdownOutlineItem 数组，包含标题层级、文本、行号。
- * 解析边界：
- *   - 只识别 ATX 标题（# 开头），不处理 Setext 标题。
- *   - 必须 # 后有空格才算标题（"# 标题" 有效，"#标题" 不识别）。
- *   - 行首允许 0-3 个空格缩进。
- *   - 忽略 fenced code block 内的伪标题。
- *   - 去掉末尾 closing hashes（"## 标题 ##" → "标题"）。
- * 为什么要忽略代码块内标题：
- *   代码块中的 "#" 行可能是注释或示例，不应出现在大纲中，
- *   否则会导致用户混淆和大纲跳转错误。
+ * 输出：MarkdownOutlineItem 数组，text 字段为清洗后的纯文本。
  */
-
 export interface MarkdownOutlineItem {
-  /** 唯一标识 */
   id: string;
-  /** 标题级别 1-6 */
   level: number;
-  /** 标题文本，已去除 # 前缀和末尾 closing hashes */
   text: string;
-  /** 在原文中的 1-based 行号 */
   line: number;
-  /** 原始行文本，保留用于调试 */
   raw: string;
 }
 
 /**
- * 解析 Markdown 文本中的 ATX 标题，返回大纲条目列表。
- * 会自动跳过 fenced code block 内的内容，避免代码块中的
- * 注释行被误识别为标题。
+ * 清洗标题文本，去除 Markdown 行内语法标记。
+ * - 去除 **bold** / __bold__ → bold
+ * - 去除 *italic* / _italic_ → italic
+ * - 去除 `code` → code
+ * - 去除 [text](url) → text
+ * - 去除 ![alt](url) → alt
+ * - 去除 ~~strike~~ → strike
+ * - 去除 HTML 标签
+ * - 去除剩余 * / _ / ` 字符
  */
+function cleanMarkdownHeadingText(text: string): string {
+  let cleaned = text;
+
+  // 图片 ![alt](url) → alt
+  cleaned = cleaned.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+  // 链接 [text](url) → text
+  cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  // 粗体 **text** 或 __text__
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, "$1");
+  cleaned = cleaned.replace(/__([^_]+)__/g, "$1");
+  // 斜体 *text* 或 _text_
+  cleaned = cleaned.replace(/\*([^*]+)\*/g, "$1");
+  cleaned = cleaned.replace(/_([^_]+)_/g, "$1");
+  // 删除线 ~~text~~
+  cleaned = cleaned.replace(/~~([^~]+)~~/g, "$1");
+  // 行内代码 `text`
+  cleaned = cleaned.replace(/`([^`]+)`/g, "$1");
+  // HTML 标签
+  cleaned = cleaned.replace(/<[^>]+>/g, "");
+  // 残留的标记符号
+  cleaned = cleaned.replace(/[*_`~]/g, "");
+  // 多余空白
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+
+  return cleaned;
+}
+
 export function parseMarkdownOutline(content: string): MarkdownOutlineItem[] {
   const lines = content.split("\n");
   const items: MarkdownOutlineItem[] = [];
@@ -39,10 +57,8 @@ export function parseMarkdownOutline(content: string): MarkdownOutlineItem[] {
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
-    // 跳过纯空白行开头引出的 fence 判断错误 — 只检查 trimmed
     const trimmed = rawLine.trimStart();
 
-    // 检测 fenced code block 边界（三反引号或三波浪号）
     const fenceMatch = trimmed.match(/^(```|~~~)/);
     if (fenceMatch) {
       if (!inCodeBlock) {
@@ -50,27 +66,23 @@ export function parseMarkdownOutline(content: string): MarkdownOutlineItem[] {
         codeBlockFence = fenceMatch[1];
         continue;
       }
-      // 同一类型的 fence 结束代码块
       if (fenceMatch[1] === codeBlockFence) {
         inCodeBlock = false;
         codeBlockFence = "";
         continue;
       }
-      // 不同类型 fence 当作代码块内容，不改变状态
     }
 
-    // 处于代码块内时跳过所有行
     if (inCodeBlock) continue;
 
-    // 匹配 ATX 标题：行首最多 3 空格 + 1-6 个 # + 空格 + 文本
     const headingMatch = rawLine.match(/^ {0,3}(#{1,6}) (.+)$/);
     if (!headingMatch) continue;
 
     const level = headingMatch[1].length;
-    // 去掉末尾的 closing hashes 和空白
-    let text = headingMatch[2].replace(/\s*#+\s*$/, "").trim();
+    let rawText = headingMatch[2].replace(/\s*#+\s*$/, "").trim();
+    if (rawText === "") continue;
 
-    // 空标题不加入大纲（去除 closing hashes 后可能为空）
+    const text = cleanMarkdownHeadingText(rawText);
     if (text === "") continue;
 
     items.push({
