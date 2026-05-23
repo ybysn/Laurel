@@ -74,6 +74,20 @@ function extractWorkspaceName(fullPath: string): string {
   return trimmed.split(/[\\/]/).pop() ?? fullPath;
 }
 
+/** 将工作区文件树扁平化为 { path, fileName }[]，仅保留 Markdown 文件 */
+function flattenWorkspaceTree(items: MarkdownTreeItem[]): { path: string; fileName: string }[] {
+  const result: { path: string; fileName: string }[] = [];
+  for (const item of items) {
+    if (!item.is_dir && item.path) {
+      result.push({ path: item.path, fileName: item.file_name });
+    }
+    if (item.children) {
+      result.push(...flattenWorkspaceTree(item.children));
+    }
+  }
+  return result;
+}
+
 type PendingAction = () => Promise<void> | void;
 
 interface UnsavedConfirmState {
@@ -105,6 +119,12 @@ export function AppShell() {
 
   // ── 快速打开 ─────────────────────────────
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
+
+  // ── 工作区文件扁平化（用于快速打开搜索） ──
+  const flatWorkspaceFiles = useMemo(
+    () => flattenWorkspaceTree(workspaceTree),
+    [workspaceTree],
+  );
 
   // ── 专注 / 全屏 ───────────────────────────
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -538,6 +558,7 @@ export function AppShell() {
       <QuickOpenDialog
         open={quickOpenOpen}
         recentFiles={recentFiles}
+        workspaceFiles={flatWorkspaceFiles}
         currentPath={doc.currentPath}
         onOpenFile={(path) => {
           setQuickOpenOpen(false);
