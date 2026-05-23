@@ -6,7 +6,6 @@ import {
   renderMarkdownToHtml,
   extractMarkdownImageSources,
 } from "../../editor/markdown/render_markdown";
-import { renderMermaidBlocks } from "../../editor/markdown/mermaid_renderer";
 import {
   resolveMarkdownAssetPath,
   safeDecodeMarkdownImageSrc,
@@ -187,11 +186,12 @@ export function MarkdownPreview({
 
     const run = async () => {
       try {
+        const { renderMermaidBlocks } = await import("../../editor/markdown/mermaid_renderer");
+        if (cancelled) return;
         await renderMermaidBlocks(container, theme);
       } catch {
         // 渲染失败不影响其他内容
       }
-      // mermaid.render 是异步的，可能在 React 重新渲染期间完成
       if (cancelled) return;
     };
 
