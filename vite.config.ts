@@ -32,6 +32,13 @@ export default defineConfig(async () => ({
 
   // 构建分包：将大型第三方依赖拆出主入口，消除 chunk size 告警
   build: {
+    // 合理大 chunk 阈值说明：
+    //   milkdown-vendor (~962KB) 是编辑器核心依赖，必须首屏加载
+    //   mermaid-vendor (~2.8MB)  已改为动态 import 按需加载
+    //   markdown-vendor (~550KB) 已精简 highlight.js 从全量到 core+15 语言
+    //   阈值设为 3000KB，避免已知合理 chunk 反复产生噪音 warning
+    chunkSizeWarningLimit: 3000,
+
     rollupOptions: {
       output: {
         manualChunks(id: string) {
