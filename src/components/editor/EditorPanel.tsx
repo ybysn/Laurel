@@ -477,8 +477,8 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           }
         }
       };
-      window.addEventListener("keydown", handler);
-      return () => window.removeEventListener("keydown", handler);
+      window.addEventListener("keydown", handler, { capture: true });
+      return () => window.removeEventListener("keydown", handler, { capture: true });
     }, [openFind, onToggleSidebar]);
 
     // ── 编辑命令执行 ──────────────────────────

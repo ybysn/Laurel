@@ -202,8 +202,8 @@ export function AppShell() {
       }
     };
 
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
   }, [isFullscreen, isFocusMode, toggleFullscreen, toggleFocusMode, isSidebarVisible]);
 
   actionRef.current = unsavedConfirm.action;
@@ -555,6 +555,36 @@ export function AppShell() {
       alert(`另存为失败: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [doc.content, doc.fileName, addToRecent]);
+
+  // ── 文件操作快捷键：Ctrl+S / Ctrl+O / Ctrl+N / Ctrl+Shift+S ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing || e.key === "Process") return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (e.shiftKey && k === "s") {
+        e.preventDefault();
+        void handleSaveAs();
+        return;
+      }
+      switch (k) {
+        case "s":
+          e.preventDefault();
+          handleSave();
+          break;
+        case "o":
+          e.preventDefault();
+          handleOpen();
+          break;
+        case "n":
+          e.preventDefault();
+          handleNew();
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
+  }, [handleSave, handleOpen, handleNew, handleSaveAs]);
 
   // ── 导出 HTML ─────────────────────────────────
   const handleExportHtml = useCallback(async () => {
