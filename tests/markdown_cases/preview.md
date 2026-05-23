@@ -108,7 +108,7 @@ count
 
 <br />
 
-number
+numberssss
 
 <br />
 
@@ -134,7 +134,7 @@ interface User {
 
 &#x20; name: string;
 
-&#x20; age: number;
+&#x20; age: numberss;
 
 }
 
@@ -203,7 +203,7 @@ This section has bold text, italic text, and code mixed together with a link and
 | Name  | Type   | Description    |
 | ----- | ------ | -------------- |
 | title | string | Document title |
-| count | number | Item count     |
+| count | numberss | Item count     |
 | done  | bool   | is completed   |
 
 ## Code Block
@@ -211,7 +211,7 @@ This section has bold text, italic text, and code mixed together with a link and
 ```typescript
 interface User {
   name: string;
-  age: number;
+  age: numberss;
 }
 
 function greet(user: User): string {

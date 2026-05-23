@@ -50,6 +50,13 @@ export interface TyporaEditorPanelProps {
 
 export interface TyporaEditorPanelHandle {
   insertImageFiles: (files: File[], source?: ImageInsertSource) => Promise<void>;
+  highlightFindMatches: (query: string, caseSensitive: boolean, activeIndex: number) => boolean;
+  clearFindHighlights: () => void;
+  scrollToFindMatch: (activeIndex: number) => void;
+  getSelectedText: () => string;
+  /** 注册查找参数 observer: ProseMirror DOM 重写后自动恢复高亮 */
+  setFindObserver: (opts: { query: string; caseSensitive: boolean; activeIndex: number } | null) => void;
+  refreshContent: (newContent: string) => void;
 }
 
 export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEditorPanelProps>(
@@ -85,6 +92,8 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
     currentPathRef.current = currentPath;
 
     const [isDragOver, setIsDragOver] = useState(false);
+    /** 替换操作后触发编辑器重建的版本号 */
+    const [refreshVersion, setRefreshVersion] = useState(0);
 
     /** 检查当前生命周期是否有效（mounted + generation 匹配） */
     const isLive = useCallback((gen: number) => isMountedRef.current && generationRef.current === gen, []);
@@ -108,6 +117,7 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       return () => {
         isMountedRef.current = false;
         generationRef.current++;
+        if (findDebounceRef.current) clearTimeout(findDebounceRef.current);
         console.debug("[WRITING_LIFECYCLE] cleanup generation", generationRef.current);
         rafIdsRef.current.forEach((id) => cancelAnimationFrame(id));
         rafIdsRef.current.clear();
@@ -190,48 +200,6 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       for (const img of imgs) void patchSingleImage(img as HTMLImageElement, gen);
     }, [patchSingleImage]);
 
-    // ── MutationObserver ──
-    useEffect(() => {
-      const container = containerRef.current;
-      if (!container) return;
-
-      const observer = new MutationObserver((mutations) => {
-        const gen = generationRef.current;
-        if (!isLive(gen)) return;
-
-        for (const m of mutations) {
-          if (m.type === "childList") {
-            for (const node of m.addedNodes) {
-              if (node instanceof HTMLImageElement) {
-                void patchSingleImage(node, gen);
-              } else if (node instanceof HTMLElement) {
-                node.querySelectorAll?.("img").forEach(
-                  (img) => void patchSingleImage(img as HTMLImageElement, gen),
-                );
-              }
-            }
-          } else if (m.type === "attributes" && m.attributeName === "src") {
-            if (m.target instanceof HTMLImageElement) {
-              patchedImagesRef.current.delete(m.target);
-              void patchSingleImage(m.target, gen);
-            }
-          }
-        }
-      });
-
-      observer.observe(container, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["src"],
-      });
-
-      return () => {
-        console.debug("[WRITING_OBSERVER] disconnected generation", generationRef.current);
-        observer.disconnect();
-      };
-    }, [isLive, patchSingleImage]);
-
     // ── 统一图片插入入口 ──
     const insertImageFiles = useCallback(
       async (files: File[], source: ImageInsertSource = "button") => {
@@ -299,7 +267,169 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       [currentPath, isLive, safeRaf, patchAllImages],
     );
 
-    useImperativeHandle(ref, () => ({ insertImageFiles }), [insertImageFiles]);
+    // ── 查找高亮（写作模式 DOM 层） ──
+    const findObserverRef = useRef<{ query: string; caseSensitive: boolean; activeIndex: number } | null>(null);
+
+    const highlightFindMatches = useCallback((query: string, caseSensitive: boolean, activeIndex: number): boolean => {
+      const container = containerRef.current;
+      if (!container || !query) return false;
+
+      clearFindHighlights();
+
+      const target = caseSensitive ? query : query.toLowerCase();
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => {
+          if (!node.textContent) return NodeFilter.FILTER_REJECT;
+          if (node.parentElement?.closest("script,style,pre,code")) return NodeFilter.FILTER_REJECT;
+          if (node.parentElement?.closest(".writing-find-match")) return NodeFilter.FILTER_REJECT;
+          const src = caseSensitive ? node.textContent : node.textContent.toLowerCase();
+          return src.includes(target) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        },
+      });
+
+      const textNodes: Text[] = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
+
+      let globalIdx = 0;
+      for (const node of textNodes) {
+        const text = node.textContent ?? "";
+        const source = caseSensitive ? text : text.toLowerCase();
+        let pos = 0;
+        const frag = document.createDocumentFragment();
+
+        while (pos < text.length) {
+          const idx = source.indexOf(target, pos);
+          if (idx === -1) {
+            frag.appendChild(document.createTextNode(text.slice(pos)));
+            break;
+          }
+          if (idx > pos) frag.appendChild(document.createTextNode(text.slice(pos, idx)));
+          const mark = document.createElement("mark");
+          mark.className = "writing-find-match";
+          if (globalIdx === activeIndex) mark.classList.add("is-active");
+          mark.textContent = text.slice(idx, idx + target.length);
+          frag.appendChild(mark);
+          pos = idx + target.length;
+          globalIdx++;
+        }
+        node.parentNode?.replaceChild(frag, node);
+      }
+
+      return globalIdx > 0;
+    }, []);
+
+    const clearFindHighlights = useCallback(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const marks = container.querySelectorAll(".writing-find-match");
+      for (const m of marks) {
+        const parent = m.parentNode;
+        if (parent) {
+          parent.replaceChild(document.createTextNode(m.textContent ?? ""), m);
+          parent.normalize();
+        }
+      }
+    }, []);
+
+    const scrollToFindMatch = useCallback((activeIndex: number) => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const allMatches = container.querySelectorAll(".writing-find-match");
+      allMatches.forEach((m) => m.classList.remove("is-active"));
+
+      if (allMatches.length === 0) return;
+      const idx = Math.max(0, Math.min(activeIndex, allMatches.length - 1));
+      const match = allMatches[idx];
+      match.classList.add("is-active");
+      match.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, []);
+
+    const getSelectedText = useCallback((): string => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !containerRef.current) return "";
+      if (!containerRef.current.contains(sel.anchorNode)) return "";
+      return sel.toString();
+    }, []);
+
+    const refreshContent = useCallback((_newContent: string) => {
+      if (crepeRef.current) {
+        crepeRef.current.destroy();
+        crepeRef.current = null;
+      }
+      docKeyRef.current = null;
+      if (containerRef.current) containerRef.current.innerHTML = "";
+      patchedImagesRef.current = new WeakSet();
+      setRefreshVersion((v) => v + 1);
+    }, []);
+
+    // ── 查找高亮自动恢复 observer ──
+    const setFindObserver = useCallback((opts: { query: string; caseSensitive: boolean; activeIndex: number } | null) => {
+      findObserverRef.current = opts;
+    }, []);
+
+    // ── find 恢复 debounce timer ──
+    const findDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const scheduleFindHighlight = useCallback(() => {
+      if (findDebounceRef.current) clearTimeout(findDebounceRef.current);
+      const opts = findObserverRef.current;
+      if (!opts || !opts.query) return;
+
+      findDebounceRef.current = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        const ok = highlightFindMatches(opts.query, opts.caseSensitive, opts.activeIndex);
+        if (ok) {
+          requestAnimationFrame(() => scrollToFindMatch(opts.activeIndex));
+        }
+      }, 100);
+    }, [highlightFindMatches, scrollToFindMatch]);
+
+    // ── MutationObserver（图片 + 查找高亮自动恢复） ──
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const observer = new MutationObserver((_mutations) => {
+        const gen = generationRef.current;
+        if (!isLive(gen)) return;
+
+        const c = containerRef.current;
+        if (c) {
+          const imgs = c.querySelectorAll("img");
+          for (const img of imgs) {
+            if (!patchedImagesRef.current.has(img as HTMLImageElement)) {
+              void patchSingleImage(img as HTMLImageElement, gen);
+            }
+          }
+        }
+
+        scheduleFindHighlight();
+      });
+
+      observer.observe(container, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["src"],
+      });
+
+      return () => {
+        console.debug("[WRITING_OBSERVER] disconnected generation", generationRef.current);
+        observer.disconnect();
+      };
+    }, [isLive, patchSingleImage, scheduleFindHighlight]);
+
+    useImperativeHandle(ref, () => ({
+      insertImageFiles,
+      highlightFindMatches,
+      clearFindHighlights,
+      scrollToFindMatch,
+      getSelectedText,
+      setFindObserver,
+      refreshContent,
+    }), [insertImageFiles, highlightFindMatches, clearFindHighlights, scrollToFindMatch, getSelectedText, setFindObserver, refreshContent]);
 
     // ── 原生 capture-phase 拖拽 ──
     useEffect(() => {
@@ -452,7 +582,7 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
         }
         console.debug("[WRITING_LIFECYCLE] cleanup generation", createGen);
       };
-    }, [currentPath, safeRaf, patchAllImages]);
+    }, [currentPath, refreshVersion, safeRaf, patchAllImages]);
 
     // ── 大纲跳转 ──
     useEffect(() => {

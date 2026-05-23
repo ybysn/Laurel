@@ -19,6 +19,7 @@ export interface FindReplaceBarProps {
   onReplaceCurrent: () => void;
   onReplaceAll: () => void;
   onToggleCaseSensitive: () => void;
+  onToggleReplace: () => void;
   onClose: () => void;
 }
 
@@ -36,6 +37,7 @@ export function FindReplaceBar({
   onReplaceCurrent,
   onReplaceAll,
   onToggleCaseSensitive,
+  onToggleReplace,
   onClose,
 }: FindReplaceBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +45,8 @@ export function FindReplaceBar({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  const hasMatches = matchCount > 0;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -54,7 +58,11 @@ export function FindReplaceBar({
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
-      onClose();
+      if (isReplaceMode) {
+        onToggleReplace();
+      } else {
+        onClose();
+      }
     }
   };
 
@@ -89,6 +97,14 @@ export function FindReplaceBar({
         Aa
       </button>
 
+      <button
+        className={`find-replace-bar__btn ${isReplaceMode ? "find-replace-bar__btn--active" : ""}`}
+        onClick={onToggleReplace}
+        title={isReplaceMode ? "收起替换" : "展开替换"}
+      >
+        {isReplaceMode ? "\u25B2 替换" : "替换"}
+      </button>
+
       {isReplaceMode && (
         <>
           <span className="find-replace-bar__sep" />
@@ -100,10 +116,20 @@ export function FindReplaceBar({
             onChange={(e) => onReplaceTextChange(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <button className="find-replace-bar__btn" onClick={onReplaceCurrent}>
+          <button
+            className="find-replace-bar__btn"
+            disabled={!hasMatches}
+            onClick={onReplaceCurrent}
+            title="替换当前匹配"
+          >
             替换
           </button>
-          <button className="find-replace-bar__btn" onClick={onReplaceAll}>
+          <button
+            className="find-replace-bar__btn"
+            disabled={!hasMatches}
+            onClick={onReplaceAll}
+            title="替换所有匹配"
+          >
             全部替换
           </button>
         </>

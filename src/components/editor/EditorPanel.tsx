@@ -303,28 +303,74 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
     // ── 查找替换 ────────────────────────────────
 
     const updateFindMatches = useCallback(() => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      matchesRef.current = findMatches(textarea.value, findQuery, { caseSensitive });
+      matchesRef.current = findMatches(content, findQuery, { caseSensitive });
       const maxIdx = Math.max(0, matchesRef.current.length - 1);
       setActiveMatchIndex((prev) => Math.min(prev, maxIdx));
-    }, [findQuery, caseSensitive]);
+
+      if (viewMode === "wysiwyg" && findQuery) {
+        typoraEditorRef.current?.highlightFindMatches(findQuery, caseSensitive, activeMatchIndex);
+      }
+    }, [findQuery, caseSensitive, content, viewMode, activeMatchIndex]);
+
+    // ── 替换后延迟高亮（等待编辑器重建） ──
+    const scheduleWritingFindHighlight = useCallback(() => {
+      let attempts = 0;
+      const maxAttempts = 5;
+      const tryHighlight = () => {
+        if (!isFindOpen || viewMode !== "wysiwyg" || !findQuery) return;
+        const ok = typoraEditorRef.current?.highlightFindMatches(findQuery, caseSensitive, activeMatchIndex);
+        if (!ok && attempts < maxAttempts) {
+          attempts++;
+          requestAnimationFrame(tryHighlight);
+        } else if (ok) {
+          typoraEditorRef.current?.scrollToFindMatch(activeMatchIndex);
+        }
+      };
+      requestAnimationFrame(tryHighlight);
+    }, [isFindOpen, viewMode, findQuery, caseSensitive, activeMatchIndex]);
 
     // query 变化时更新匹配列表
     useEffect(() => {
       updateFindMatches();
       setActiveMatchIndex(0);
+      // 注册查找参数到 TyporaEditorPanel（用于自动恢复高亮）
+      if (viewMode === "wysiwyg" && findQuery) {
+        typoraEditorRef.current?.setFindObserver({ query: findQuery, caseSensitive, activeIndex: 0 });
+      } else {
+        typoraEditorRef.current?.setFindObserver(null);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [findQuery, caseSensitive]);
 
+    // ── content 变化时更新匹配（用户编辑后自动刷新） ──
+    useEffect(() => {
+      if (!isFindOpen || !findQuery) return;
+      updateFindMatches();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [content]);
+
     const selectMatch = useCallback((index: number) => {
-      const textarea = textareaRef.current;
       const matches = matchesRef.current;
-      if (!textarea || matches.length === 0) return;
+      if (matches.length === 0) return;
       const idx = Math.max(0, Math.min(index, matches.length - 1));
+
+      setActiveMatchIndex(idx);
+
+      if (viewMode === "wysiwyg") {
+        // 同步 activeIndex 到 findObserver
+        typoraEditorRef.current?.setFindObserver({ query: findQuery, caseSensitive, activeIndex: idx });
+        // 高亮可能在上次编辑器重绘时丢失，先重高亮再滚动
+        const ok = typoraEditorRef.current?.highlightFindMatches(findQuery, caseSensitive, idx);
+        if (ok) {
+          typoraEditorRef.current?.scrollToFindMatch(idx);
+        }
+        return;
+      }
+
+      const textarea = textareaRef.current;
+      if (!textarea) return;
       const m = matches[idx];
 
-      // 滚动 textarea 到匹配行附近
       const textBefore = textarea.value.slice(0, m.start);
       const lineIndex = textBefore.split("\n").length - 1;
       const computed = window.getComputedStyle(textarea);
@@ -335,8 +381,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       textarea.scrollTop = targetTop;
       textarea.focus();
       textarea.setSelectionRange(m.start, m.end);
-      setActiveMatchIndex(idx);
-    }, []);
+    }, [viewMode, findQuery, caseSensitive]);
 
     const handleFindNext = useCallback(() => {
       const next = activeMatchIndex + 1 >= matchesRef.current.length ? 0 : activeMatchIndex + 1;
@@ -355,41 +400,53 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       const m = matches[idx];
       const result = replaceCurrentMatch(content, m, replaceText);
       onContentChange(result.content);
-      setTimeout(() => {
-        updateFindMatches();
-        const textarea = textareaRef.current;
-        if (textarea) {
-          textarea.setSelectionRange(result.cursorPos, result.cursorPos);
-          textarea.focus();
-        }
-      }, 0);
-    }, [content, activeMatchIndex, replaceText, onContentChange, updateFindMatches]);
+      if (viewMode === "wysiwyg") {
+        typoraEditorRef.current?.refreshContent(result.content);
+        scheduleWritingFindHighlight();
+      }
+      if (viewMode !== "wysiwyg") {
+        setTimeout(() => {
+          updateFindMatches();
+          const textarea = textareaRef.current;
+          if (textarea) {
+            textarea.setSelectionRange(result.cursorPos, result.cursorPos);
+            textarea.focus();
+          }
+        }, 0);
+      }
+    }, [content, activeMatchIndex, replaceText, onContentChange, viewMode, scheduleWritingFindHighlight, updateFindMatches]);
 
     const handleReplaceAll = useCallback(() => {
       if (!findQuery) return;
       const result = replaceAllMatches(content, findQuery, replaceText, { caseSensitive });
       if (result.count > 0) {
         onContentChange(result.content);
+        if (viewMode === "wysiwyg") {
+          typoraEditorRef.current?.refreshContent(result.content);
+          scheduleWritingFindHighlight();
+        }
         setTimeout(() => {
           matchesRef.current = [];
           setActiveMatchIndex(0);
         }, 0);
       }
-    }, [content, findQuery, replaceText, caseSensitive, onContentChange]);
+    }, [content, findQuery, replaceText, caseSensitive, onContentChange, viewMode, scheduleWritingFindHighlight]);
 
     const openFind = useCallback((replace?: boolean) => {
       setIsFindOpen(true);
       setIsReplaceMode(replace ?? false);
-      // 如果 textarea 有选中文本，填充到查找框
-      const textarea = textareaRef.current;
-      if (textarea) {
-        const selected = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
-        if (selected) {
-          setFindQuery(selected);
-          return;
+
+      if (viewMode === "wysiwyg") {
+        const selected = typoraEditorRef.current?.getSelectedText();
+        if (selected) { setFindQuery(selected); return; }
+      } else {
+        const textarea = textareaRef.current;
+        if (textarea) {
+          const selected = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
+          if (selected) { setFindQuery(selected); return; }
         }
       }
-    }, []);
+    }, [viewMode]);
 
     const closeFind = useCallback(() => {
       setIsFindOpen(false);
@@ -397,21 +454,40 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       setReplaceText("");
       matchesRef.current = [];
       setActiveMatchIndex(0);
+      typoraEditorRef.current?.clearFindHighlights();
+      typoraEditorRef.current?.setFindObserver(null);
     }, []);
 
-    // 写作模式下全局 Ctrl+\ 切换侧边栏（跳过 IME 组合输入）
+    const toggleReplace = useCallback(() => {
+      setIsReplaceMode((prev) => !prev);
+    }, []);
+
+    // ── 全局快捷键：Ctrl+F/Ctrl+H/Ctrl+\（在所有模式下生效） ──
     useEffect(() => {
-      if (viewMode !== "wysiwyg") return;
       const handler = (e: KeyboardEvent) => {
         if (e.isComposing || e.key === "Process") return;
-        if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
-          e.preventDefault();
-          onToggleSidebar();
+        const ctrl = e.ctrlKey || e.metaKey;
+        if (ctrl) {
+          const k = e.key.toLowerCase();
+          if (k === "f") {
+            e.preventDefault();
+            openFind(false);
+            return;
+          }
+          if (k === "h") {
+            e.preventDefault();
+            openFind(true);
+            return;
+          }
+          if (k === "\\") {
+            e.preventDefault();
+            onToggleSidebar();
+          }
         }
       };
       window.addEventListener("keydown", handler);
       return () => window.removeEventListener("keydown", handler);
-    }, [viewMode, onToggleSidebar]);
+    }, [openFind, onToggleSidebar]);
 
     // ── 编辑命令执行 ──────────────────────────
 
@@ -594,14 +670,6 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             e.preventDefault();
             applyCommand(toggleInlineCode);
             break;
-          case "f":
-            e.preventDefault();
-            openFind(false);
-            break;
-          case "h":
-            e.preventDefault();
-            openFind(true);
-            break;
           case "s":
             e.preventDefault();
             onSave();
@@ -620,7 +688,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             break;
         }
       },
-      [applyCommand, onSave, onOpen, onNew, onToggleSidebar, openFind],
+      [applyCommand, onSave, onOpen, onNew, onToggleSidebar],
     );
 
     // ── 统计 ────────────────────────────────────
@@ -842,6 +910,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
             onReplaceCurrent={handleReplaceCurrent}
             onReplaceAll={handleReplaceAll}
             onToggleCaseSensitive={() => setCaseSensitive((p) => !p)}
+            onToggleReplace={toggleReplace}
             onClose={closeFind}
           />
         )}
