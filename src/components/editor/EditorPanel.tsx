@@ -68,6 +68,9 @@ export interface EditorPanelProps {
   onExportHtml: () => void;
   onExportPdf: () => void;
   onPrint: () => void;
+  isFocusMode?: boolean;
+  onToggleFocus?: () => void;
+  onToggleFullscreen?: () => void;
 }
 
 export interface EditorPanelHandle {
@@ -141,6 +144,9 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       onExportHtml,
       onExportPdf,
       onPrint,
+      isFocusMode = false,
+      onToggleFocus,
+      onToggleFullscreen,
     },
     ref,
   ) {
@@ -755,7 +761,29 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           </div>
 
           <span className="editor-toolbar__sep" />
-          <div className="editor-export-menu" ref={exportMenuRef}>
+          {onToggleFocus && (
+            <button
+              className="editor-toolbar__btn"
+              title="专注模式 (Ctrl+Shift+F)"
+              onClick={onToggleFocus}
+            >
+              {isFocusMode ? "\u2714 专注" : "\u25A2 专注"}
+            </button>
+          )}
+          {onToggleFullscreen && (
+            <button
+              className="editor-toolbar__btn"
+              title="全屏 (F11)"
+              onClick={onToggleFullscreen}
+            >
+              {"\u26F6 全屏"}
+            </button>
+          )}
+
+          {!isFocusMode && (
+            <>
+              <span className="editor-toolbar__sep" />
+              <div className="editor-export-menu" ref={exportMenuRef}>
             <button
               className="editor-toolbar__btn"
               title="导出"
@@ -794,6 +822,8 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           >
             &#9881;
           </button>
+            </>
+          )}
         </div>
 
         {/* 状态消息 */}

@@ -98,6 +98,39 @@ body {
   flex: 1;
 }
 
+/* ===== 专注模式 ===== */
+.app-shell--focus .app-shell__main {
+  max-width: 960px;
+  margin: 0 auto;
+}
+.app-shell--focus .editor-toolbar {
+  background-color: var(--color-bg);
+  border-bottom-color: transparent;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.app-shell--focus .editor-toolbar__spacer {
+  flex: 0;
+}
+.app-shell--focus .status-bar {
+  background-color: var(--color-bg);
+  border-top-color: transparent;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.app-shell--focus .editor-textarea {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.app-shell--focus .typora-editor .milkdown .editor[contenteditable] {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.app-shell--focus .markdown-preview {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
 /* ===== 侧边栏面板 ===== */
 .sidebar-panel {
   display: flex;

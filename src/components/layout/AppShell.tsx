@@ -3,6 +3,7 @@
  */
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { SidebarPanel } from "./SidebarPanel";
 import { ConfirmDialog } from "../dialogs/ConfirmDialog";
@@ -100,6 +101,68 @@ export function AppShell() {
   const [unsavedConfirm, setUnsavedConfirm] = useState<UnsavedConfirmState>({ visible: false, action: null });
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionRef = useRef<PendingAction | null>(null);
+
+  // ── 专注 / 全屏 ───────────────────────────
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const previousSidebarRef = useRef(isSidebarVisible);
+
+  const toggleFocusMode = useCallback(() => {
+    setIsFocusMode((prev) => {
+      if (!prev) {
+        previousSidebarRef.current = isSidebarVisible;
+        setIsSidebarVisible(false);
+      } else {
+        setIsSidebarVisible(previousSidebarRef.current);
+      }
+      return !prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSidebarVisible]);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      const win = getCurrentWindow();
+      const fs = await win.isFullscreen();
+      await win.setFullscreen(!fs);
+      setIsFullscreen(!fs);
+    } catch {
+      // 非 Tauri 环境
+    }
+  }, []);
+
+  // ── 快捷键：F11 / Ctrl+Shift+F / Esc ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing || e.key === "Process") return;
+
+      if (e.key === "F11") {
+        e.preventDefault();
+        void toggleFullscreen();
+        return;
+      }
+
+      if (e.ctrlKey && e.shiftKey && e.key === "F") {
+        e.preventDefault();
+        toggleFocusMode();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (isFullscreen) {
+          void toggleFullscreen();
+          return;
+        }
+        if (isFocusMode) {
+          setIsFocusMode(false);
+          setIsSidebarVisible(previousSidebarRef.current);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isFullscreen, isFocusMode, toggleFullscreen, toggleFocusMode, isSidebarVisible]);
 
   actionRef.current = unsavedConfirm.action;
   const hasActiveDocument = doc.isEditing;
@@ -481,7 +544,7 @@ export function AppShell() {
           onOpenRecentWorkspace={handleOpenRecentWorkspace}
         />
       ) : (
-        <div className={`app-shell ${!isSidebarVisible ? "app-shell--sidebar-hidden" : ""}`}>
+        <div className={`app-shell ${!isSidebarVisible ? "app-shell--sidebar-hidden" : ""} ${isFocusMode ? "app-shell--focus" : ""}`}>
           {isSidebarVisible && (
             <aside className="app-shell__sidebar">
               <SidebarPanel
@@ -537,6 +600,9 @@ export function AppShell() {
               onToggleAutoSave={() => handleSaveSettings({ ...settings, autoSaveEnabled: !settings.autoSaveEnabled })}
               onOpenSettings={() => setSettingsOpen(true)}
               onUpdateSettings={(partial) => handleSaveSettings({ ...settings, ...partial })}
+              isFocusMode={isFocusMode}
+              onToggleFocus={toggleFocusMode}
+              onToggleFullscreen={toggleFullscreen}
               onExportHtml={async () => {
                 try {
                   const raw = await save({
