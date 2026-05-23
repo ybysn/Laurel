@@ -2,20 +2,31 @@
  * 模块职责：Mermaid 图表渲染服务。
  * 输入：container HTMLElement + theme。
  * 输出：将 container 内 .mermaid-block 替换为 SVG。
+ * Mermaid 采用动态 import，仅在首次渲染时加载，避免首屏体积膨胀。
  */
-import mermaid from "mermaid";
 
+// ── Mermaid 懒加载 ─────────────────────────
+
+let mermaidInstance: any = null;
 let initialized = false;
 
-function ensureInit(theme: "light" | "dark") {
-  if (!initialized) {
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: "strict",
-      theme: theme === "dark" ? "dark" : "default",
-    });
-    initialized = true;
+async function getMermaid(): Promise<typeof import("mermaid")["default"]> {
+  if (!mermaidInstance) {
+    const mod = await import("mermaid");
+    mermaidInstance = (mod as any).default ?? mod;
   }
+  return mermaidInstance;
+}
+
+async function ensureInit(theme: "light" | "dark") {
+  if (initialized) return;
+  const mermaid = await getMermaid();
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: theme === "dark" ? "dark" : "default",
+  });
+  initialized = true;
 }
 
 /**
@@ -26,7 +37,8 @@ export async function renderMermaidBlocks(
   container: HTMLElement,
   theme: "light" | "dark",
 ): Promise<void> {
-  ensureInit(theme);
+  await ensureInit(theme);
+  const mermaid = await getMermaid();
 
   const blocks = container.querySelectorAll<HTMLElement>(".mermaid-block");
   for (const block of blocks) {
