@@ -1443,6 +1443,117 @@ body {
   background-color: #b91c1c;
 }
 
+/* 快速打开弹窗 */
+.quick-open-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+  z-index: 1000;
+}
+
+.quick-open {
+  width: 560px;
+  max-height: 420px;
+  background: var(--color-bg-primary, #ffffff);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.quick-open__input {
+  padding: 12px 16px;
+  font-size: 15px;
+  border: none;
+  border-bottom: 1px solid var(--color-border-light, #e2e8f0);
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary, #1a202c);
+}
+
+.quick-open__input::placeholder {
+  color: var(--color-text-muted, #a0aec0);
+}
+
+.quick-open__empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--color-text-muted, #a0aec0);
+  font-size: 14px;
+}
+
+.quick-open__list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.quick-open__item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border-light, #f0f0f0);
+}
+
+.quick-open__item--active {
+  background: var(--color-bg-hover, #edf2f7);
+}
+
+.quick-open__item--current {
+  /* 当前文件标记由 current-tag 体现 */
+}
+
+.quick-open__file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a202c);
+}
+
+.quick-open__current-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-muted, #718096);
+  background: var(--color-bg-hover, #edf2f7);
+  border-radius: 3px;
+}
+
+.quick-open__file-path {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-muted, #a0aec0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 480px;
+}
+
+/* 暗黑主题 */
+[data-theme="dark"] .quick-open {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .quick-open__input {
+  border-bottom-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .quick-open__item--active {
+  background: #334155;
+}
+
+[data-theme="dark"] .quick-open__current-tag {
+  background: #334155;
+}
+
 .welcome-recent-list {
   list-style: none;
   margin: 0;

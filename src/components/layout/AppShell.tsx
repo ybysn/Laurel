@@ -7,6 +7,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { SidebarPanel } from "./SidebarPanel";
 import { ConfirmDialog } from "../dialogs/ConfirmDialog";
+import { QuickOpenDialog } from "../dialogs/QuickOpenDialog";
 import { useWindowCloseGuard } from "../../app/use_window_close_guard";
 import { SettingsPanel } from "../settings/SettingsPanel";
 import {
@@ -102,6 +103,9 @@ export function AppShell() {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionRef = useRef<PendingAction | null>(null);
 
+  // ── 快速打开 ─────────────────────────────
+  const [quickOpenOpen, setQuickOpenOpen] = useState(false);
+
   // ── 专注 / 全屏 ───────────────────────────
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -131,10 +135,17 @@ export function AppShell() {
     }
   }, []);
 
-  // ── 快捷键：F11 / Ctrl+Shift+F / Esc ──
+  // ── 快捷键：F11 / Ctrl+Shift+F / Esc / Ctrl+P ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.isComposing || e.key === "Process") return;
+
+      // Ctrl+P / Meta+P：快速打开
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setQuickOpenOpen(true);
+        return;
+      }
 
       if (e.key === "F11") {
         e.preventDefault();
@@ -523,6 +534,17 @@ export function AppShell() {
           onDiscardAndContinue={handleDiscardAndContinue}
         />
       )}
+
+      <QuickOpenDialog
+        open={quickOpenOpen}
+        recentFiles={recentFiles}
+        currentPath={doc.currentPath}
+        onOpenFile={(path) => {
+          setQuickOpenOpen(false);
+          handleOpenRecentFile(path);
+        }}
+        onClose={() => setQuickOpenOpen(false)}
+      />
 
       {closeGuardDialog}
 
