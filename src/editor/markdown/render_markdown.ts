@@ -188,27 +188,7 @@ md.renderer.rules.image = function (tokens, idx, options, env, self) {
   return defaultImageRenderer(tokens, idx, options, env, self);
 };
 
-export function extractMarkdownImageSources(content: string): string[] {
-  const tokens = md.parse(content, {});
-  const sources: string[] = [];
-  for (const token of tokens) {
-    if (token.type === "inline") {
-      for (const child of token.children ?? []) {
-        if (child.type === "image") {
-          const src = child.attrGet("src");
-          if (
-            src &&
-            !/^(https?:|data:|asset:|ipc:|blob:)/i.test(src) &&
-            !src.includes("asset.localhost")
-          ) {
-            sources.push(src);
-          }
-        }
-      }
-    }
-  }
-  return [...new Set(sources)];
-}
+export { extractMarkdownImageSources } from "./image_source_extractor";
 
 export function renderMarkdownToHtml(
   content: string,

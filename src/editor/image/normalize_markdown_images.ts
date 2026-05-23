@@ -4,7 +4,7 @@
  * 输出：清洗后的 markdown 字符串。
  * 调用时机：所有 onChange / markdownUpdated / 保存前必须调用。
  */
-import { extractMarkdownImageSources } from "../markdown/render_markdown";
+import { extractMarkdownImageSources } from "../markdown/image_source_extractor";
 
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -79,21 +79,4 @@ export function normalizeMarkdownImageSources(markdown: string): string {
  * 检测 Markdown 中是否存在不安全图片源。
  * 返回不安全源的数量，0 表示安全。
  */
-export function detectUnsafeImageSources(markdown: string): number {
-  const sources = extractMarkdownImageSources(markdown);
-  let count = 0;
-  for (const src of sources) {
-    if (
-      /^blob:/i.test(src) ||
-      /^data:/i.test(src) ||
-      /localhost:\d+/.test(src) ||
-      src.includes("asset.localhost") ||
-      /^[a-zA-Z]:[/\\]/.test(src) ||
-      src.startsWith("/")
-    ) {
-      console.warn("[IMAGE_GUARD] unsafe image source detected", { src: src.slice(0, 80) });
-      count++;
-    }
-  }
-  return count;
-}
+export { detectUnsafeImageSources } from "../markdown/image_source_extractor";
