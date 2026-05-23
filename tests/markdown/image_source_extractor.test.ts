@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractMarkdownImageSources, detectUnsafeImageSources } from "../../src/editor/markdown/image_source_extractor";
+import { extractMarkdownImageSources, extractBlobImageSources, detectUnsafeImageSources } from "../../src/editor/markdown/image_source_extractor";
 
 describe("extractMarkdownImageSources", () => {
   it("提取单个本地图片 src", () => {
@@ -67,5 +67,39 @@ describe("detectUnsafeImageSources", () => {
     // 使用正斜线路径以便 markdown-it 正确解析
     const result = detectUnsafeImageSources("![a](C:/path/to/a.png)");
     expect(result).toBe(1);
+  });
+});
+
+describe("extractBlobImageSources", () => {
+  it("提取 blob:http URL", () => {
+    const result = extractBlobImageSources("![a](blob:http://localhost:1420/abc-123)");
+    expect(result).toEqual(["blob:http://localhost:1420/abc-123"]);
+  });
+
+  it("提取多个 blob URL", () => {
+    const result = extractBlobImageSources(
+      "![a](blob:http://localhost/a)\n![b](blob:http://localhost/b)"
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it("相对路径不被误判为 blob", () => {
+    const result = extractBlobImageSources("![a](./a.png)");
+    expect(result).toEqual([]);
+  });
+
+  it("data URI 不被误判为 blob", () => {
+    const result = extractBlobImageSources("![a](data:image/png;base64,abc)");
+    expect(result).toEqual([]);
+  });
+
+  it("无图片时返回空", () => {
+    const result = extractBlobImageSources("hello world");
+    expect(result).toEqual([]);
+  });
+
+  it("代码块内的 blob 图片不被识别", () => {
+    const result = extractBlobImageSources("\`\`\`\n![a](blob:http://localhost/a)\n\`\`\`");
+    expect(result).toEqual([]);
   });
 });

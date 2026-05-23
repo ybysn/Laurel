@@ -56,3 +56,25 @@ export function detectUnsafeImageSources(markdown: string): number {
   }
   return count;
 }
+
+/**
+ * 从 Markdown 中提取所有 blob: 协议的图片 src。
+ * 用于导出前检测并转换为 .assets 相对路径。
+ */
+export function extractBlobImageSources(content: string): string[] {
+  const tokens = imageMd.parse(content, {});
+  const sources: string[] = [];
+  for (const token of tokens) {
+    if (token.type === "inline") {
+      for (const child of token.children ?? []) {
+        if (child.type === "image") {
+          const src = child.attrGet("src");
+          if (src && /^blob:/i.test(src)) {
+            sources.push(src);
+          }
+        }
+      }
+    }
+  }
+  return sources;
+}

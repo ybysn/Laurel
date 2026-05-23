@@ -7,11 +7,12 @@ import {
   renderMarkdownToHtml,
   extractMarkdownImageSources,
 } from "../editor/markdown/render_markdown";
+import { extractBlobImageSources } from "../editor/markdown/image_source_extractor";
 import {
   resolveMarkdownAssetPath,
   safeDecodeMarkdownImageSrc,
 } from "../services/path_service";
-import { readImageAssetAsDataUrl } from "../services/asset_service";
+import { readImageAssetAsDataUrl, saveImageAsset } from "../services/asset_service";
 
 export interface ExportHtmlOptions {
   content: string;
@@ -96,11 +97,68 @@ em { font-style: italic; }
 .katex-html { display: none; }
 `.trim();
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * 将 Markdown 内容中的 blob 图片转换为 .assets 相对路径。
+ * 仅当 currentPath 存在时才能执行。
+ */
+async function normalizeBlobImagesForExport(
+  content: string,
+  currentPath: string | null | undefined,
+): Promise<{ content: string; unchanged: boolean }> {
+  const blobSources = extractBlobImageSources(content);
+  if (blobSources.length === 0) return { content, unchanged: true };
+
+  if (!currentPath) {
+    throw new Error(
+      "Markdown 中存在临时图片 (blob: URL)，当前文档未保存，无法导出。请先保存文档 (Ctrl+S) 后再导出。",
+    );
+  }
+
+  let cleaned = content;
+  let converted = 0;
+
+  for (const src of blobSources) {
+    try {
+      const response = await fetch(src);
+      if (!response.ok) {
+        console.warn("[EXPORT] blob fetch failed", { src: src.slice(0, 60), status: response.status });
+        continue;
+      }
+      const data = await response.blob();
+      const ext = data.type.split("/")[1] ?? "png";
+      const file = new File([data], `export-${Date.now()}.${ext}`, { type: data.type });
+      const asset = await saveImageAsset(currentPath, file);
+      cleaned = cleaned.replace(
+        new RegExp(`!\\[([^\\]]*)\\]\\(${escapeRegExp(src)}\\)`, "g"),
+        `![$1](${asset.relative_path})`,
+      );
+      converted++;
+    } catch (err) {
+      console.warn("[EXPORT] blob conversion failed", { src: src.slice(0, 60), err });
+    }
+  }
+
+  if (converted === 0 && blobSources.length > 0) {
+    throw new Error(
+      "存在未资产化的临时图片 (blob: URL)，且无法自动转换。请重新粘贴图片或先保存文档后再导出。",
+    );
+  }
+
+  return { content: cleaned, unchanged: false };
+}
+
 export async function exportMarkdownToHtml(
   options: ExportHtmlOptions,
 ): Promise<string> {
-  const { content, currentPath, fileName } = options;
+  const { content: rawContent, currentPath, fileName } = options;
   const title = getExportTitle(fileName);
+
+  // 导出前将 blob 图片转换为 .assets 相对路径
+  const { content } = await normalizeBlobImagesForExport(rawContent, currentPath);
 
   // 构建 imageSrcMap：本地图片 → data URL
   const imageSrcMap: Record<string, string> = {};
@@ -199,8 +257,11 @@ ul, ol { padding-left: 1.5em; }
 export async function buildPrintableHtml(
   options: ExportHtmlOptions,
 ): Promise<string> {
-  const { content, currentPath, fileName } = options;
+  const { content: rawContent, currentPath, fileName } = options;
   const title = getExportTitle(fileName);
+
+  // 导出前将 blob 图片转换为 .assets 相对路径
+  const { content } = await normalizeBlobImagesForExport(rawContent, currentPath);
 
   const imageSrcMap: Record<string, string> = {};
   if (currentPath) {
