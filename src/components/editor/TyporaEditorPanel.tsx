@@ -6,6 +6,9 @@
  *   - markdownUpdated 时用 normalizeMarkdownImageSources 清洗 blob/data/localhost
  *   - MutationObserver 监听新增 img 节点自动 patch
  *   - 图片插入时 ProseMirror 节点 src 使用 relativePath
+ * 生命周期安全：
+ *   - generationRef 单调递增，所有异步任务执行前校验
+ *   - img.isConnected 确保不操作已销毁 DOM（触发 ProseMirror 内部 DOM→state 链条）
  */
 import {
   useEffect,
@@ -67,6 +70,12 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
     const onStatusRef = useRef(onStatusMessage);
     onStatusRef.current = onStatusMessage;
     const dropProcessingRef = useRef(false);
+
+    // ── 生命周期 guard ──
+    const isMountedRef = useRef(false);
+    const generationRef = useRef(0);
+    const rafIdsRef = useRef<Set<number>>(new Set());
+
     /** relativePath → dataUrl 缓存（用于 DOM patch） */
     const relativeDataUrlCacheRef = useRef<Map<string, string>>(new Map());
     /** 已处理的 img 元素集合（避免重复 patch） */
@@ -76,30 +85,54 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
 
     const [isDragOver, setIsDragOver] = useState(false);
 
+    /** 检查当前生命周期是否有效（mounted + generation 匹配） */
+    const isLive = useCallback((gen: number) => isMountedRef.current && generationRef.current === gen, []);
+
+    // ── 安全 RAF ──
+    const safeRaf = useCallback((fn: () => void) => {
+      const gen = generationRef.current;
+      const id = requestAnimationFrame(() => {
+        rafIdsRef.current.delete(id);
+        if (isLive(gen)) fn();
+      });
+      rafIdsRef.current.add(id);
+      return id;
+    }, [isLive]);
+
+    // ── 组件挂载/卸载 ──
+    useEffect(() => {
+      generationRef.current++;
+      isMountedRef.current = true;
+      console.debug("[WRITING_LIFECYCLE] mount generation", generationRef.current);
+      return () => {
+        isMountedRef.current = false;
+        generationRef.current++;
+        console.debug("[WRITING_LIFECYCLE] cleanup generation", generationRef.current);
+        rafIdsRef.current.forEach((id) => cancelAnimationFrame(id));
+        rafIdsRef.current.clear();
+      };
+    }, []);
+
     // ── DOM patch：将 img.src 替换为 data URL ──
-    const patchSingleImage = useCallback(async (img: HTMLImageElement) => {
+    const patchSingleImage = useCallback(async (img: HTMLImageElement, gen: number) => {
+      // 已处理过，跳过
       if (patchedImagesRef.current.has(img)) return;
 
       const src = img.getAttribute("src") || img.src || "";
       if (!src) { patchedImagesRef.current.add(img); return; }
 
-      // 跳过外部 URL
+      // 跳过外部 URL（非本地）
       if (/^https?:\/\//i.test(src) && !/localhost:\d+/.test(src) && !src.includes("asset.localhost")) {
         patchedImagesRef.current.add(img);
         return;
       }
-      // 跳过已有效的 data URL
       if (/^data:/i.test(src)) { patchedImagesRef.current.add(img); return; }
-      // 跳过无效路径
       if (/^blob:/i.test(src)) {
-        console.warn("[PATCH][writing] blob URL img ignored", { src: src.slice(0, 80) });
         patchedImagesRef.current.add(img);
         return;
       }
 
       let relativePath = src;
-
-      // localhost/asset URL → 提取相对路径
       if (/localhost:\d+\//.test(src) || src.includes("asset.localhost")) {
         try {
           const decoded = decodeURIComponent(src);
@@ -117,6 +150,7 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       const cp = currentPathRef.current;
       if (!cp || !relativePath) { patchedImagesRef.current.add(img); return; }
 
+      // 异步读取 dataUrl
       let dataUrl = relativeDataUrlCacheRef.current.get(relativePath);
       if (!dataUrl) {
         try {
@@ -131,15 +165,28 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
         }
       }
 
+      // ★ 关键 guard：检查生命周期和 DOM 连接状态
+      // img.isConnected 为 false 表示元素已不在 DOM 中（editor 已销毁）
+      // 此时设置 img.src 会触发 ProseMirror 内部 DOM→state 链条 → editorView not found
+      if (!isLive(gen)) {
+        console.debug("[WRITING_PATCH] skip stale generation", { gen, current: generationRef.current });
+        return;
+      }
+      if (!img.isConnected || !crepeRef.current) {
+        console.debug("[WRITING_PATCH] img disconnected or editor gone, skip");
+        return;
+      }
+
       img.src = dataUrl;
       patchedImagesRef.current.add(img);
-    }, []);
+    }, [isLive]);
 
     const patchAllImages = useCallback(() => {
       const container = containerRef.current;
       if (!container) return;
+      const gen = generationRef.current;
       const imgs = container.querySelectorAll("img");
-      for (const img of imgs) void patchSingleImage(img as HTMLImageElement);
+      for (const img of imgs) void patchSingleImage(img as HTMLImageElement, gen);
     }, [patchSingleImage]);
 
     // ── MutationObserver ──
@@ -148,18 +195,24 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       if (!container) return;
 
       const observer = new MutationObserver((mutations) => {
+        const gen = generationRef.current;
+        if (!isLive(gen)) return;
+
         for (const m of mutations) {
           if (m.type === "childList") {
             for (const node of m.addedNodes) {
-              if (node instanceof HTMLImageElement) { void patchSingleImage(node); }
-              else if (node instanceof HTMLElement) {
-                node.querySelectorAll?.("img").forEach((img) => void patchSingleImage(img as HTMLImageElement));
+              if (node instanceof HTMLImageElement) {
+                void patchSingleImage(node, gen);
+              } else if (node instanceof HTMLElement) {
+                node.querySelectorAll?.("img").forEach(
+                  (img) => void patchSingleImage(img as HTMLImageElement, gen),
+                );
               }
             }
           } else if (m.type === "attributes" && m.attributeName === "src") {
             if (m.target instanceof HTMLImageElement) {
               patchedImagesRef.current.delete(m.target);
-              void patchSingleImage(m.target);
+              void patchSingleImage(m.target, gen);
             }
           }
         }
@@ -171,12 +224,25 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
         attributes: true,
         attributeFilter: ["src"],
       });
-      return () => observer.disconnect();
-    }, [patchSingleImage]);
+
+      return () => {
+        console.debug("[WRITING_OBSERVER] disconnected generation", generationRef.current);
+        observer.disconnect();
+      };
+    }, [isLive, patchSingleImage]);
 
     // ── 统一图片插入入口 ──
     const insertImageFiles = useCallback(
       async (files: File[], source: ImageInsertSource = "button") => {
+        const gen = generationRef.current;
+        if (!isLive(gen) || !crepeRef.current) {
+          console.warn("[WRITING_ACTION] skip insertImageFiles, editor not ready", { gen, source });
+          return;
+        }
+
+        const view = crepeRef.current.editor.ctx.get(editorViewCtx);
+        if (!view) return;
+
         console.debug(`[IMAGE_INSERT][writing] start`, { source, fileCount: files.length });
 
         if (!currentPath) {
@@ -184,14 +250,10 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
           return;
         }
 
-        const view = crepeRef.current?.editor?.ctx?.get(editorViewCtx);
-        if (!view) return;
+        const { results, errors } = await importImageFilesForMarkdown({ files, markdownPath: currentPath });
 
-        // 统一导入工作流
-        const { results, errors } = await importImageFilesForMarkdown({
-          files,
-          markdownPath: currentPath,
-        });
+        // 异步回来后再次检查生命周期
+        if (!isLive(gen)) return;
 
         if (results.length === 0 && errors.length > 0) {
           if (errors[0].message.includes("请先保存")) {
@@ -207,31 +269,21 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
           return;
         }
 
-        // 逐张插入到 ProseMirror
         for (const r of results) {
-          // 缓存 dataUrl 供 DOM patch 使用
+          if (!isLive(gen)) return;
           relativeDataUrlCacheRef.current.set(r.relativePath, r.dataUrl);
           relativeDataUrlCacheRef.current.set(r.assetPath, r.dataUrl);
 
           const { state, dispatch } = view;
-          const schema = state.schema;
-
-          if (schema.nodes.image) {
-            const imageNode = schema.nodes.image.create({
-              src: r.relativePath,
-              alt: r.fileName,
-              title: "",
-            });
+          if (state.schema.nodes.image) {
+            const imageNode = state.schema.nodes.image.create({ src: r.relativePath, alt: r.fileName, title: "" });
             dispatch(state.tr.insert(state.selection.from, imageNode));
           } else {
-            dispatch(state.tr.insertText(
-              `![${r.fileName}](${r.relativePath})\n`,
-              state.selection.from, state.selection.to,
-            ));
+            dispatch(state.tr.insertText(`![${r.fileName}](${r.relativePath})\n`, state.selection.from, state.selection.to));
           }
         }
 
-        requestAnimationFrame(() => patchAllImages());
+        safeRaf(() => patchAllImages());
 
         console.debug("[IMAGE_INSERT][writing] done", { success: results.length, errors: errors.length });
 
@@ -243,7 +295,7 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
           onStatusRef.current?.(`已插入 ${results.length} 张图片`);
         }
       },
-      [currentPath, patchAllImages],
+      [currentPath, isLive, safeRaf, patchAllImages],
     );
 
     useImperativeHandle(ref, () => ({ insertImageFiles }), [insertImageFiles]);
@@ -268,7 +320,6 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
         if (!e.dataTransfer?.types.includes("Files")) return;
         const files = e.dataTransfer?.files;
         if (!files || files.length === 0) return;
-
         const imageFiles = Array.from(files).filter(isImageFile);
         if (imageFiles.length === 0) return;
 
@@ -338,6 +389,10 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       const docKey = currentPath ?? "__new__";
       if (docKeyRef.current === docKey && crepeRef.current) return;
 
+      generationRef.current++;
+      const createGen = generationRef.current;
+      console.debug("[WRITING_LIFECYCLE] create start generation", createGen);
+
       const prev = crepeRef.current;
       if (prev) { prev.destroy(); crepeRef.current = null; }
       container.innerHTML = "";
@@ -352,45 +407,51 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
 
       const createStart = performance.now();
 
-      const initEditor = () => {
-        if (cancelled) return;
+      const crepe = new Crepe({ root: container, defaultValue: content });
+      crepeRef.current = crepe;
+      docKeyRef.current = docKey;
 
-        const crepe = new Crepe({
-          root: container,
-          defaultValue: content,
+      crepe.on((api) => {
+        api.markdownUpdated((_ctx, markdown) => {
+          if (cancelled || !isMountedRef.current || generationRef.current !== createGen) return;
+          if (isComposingRef.current) return;
+          const safe = normalizeMarkdownImageSources(markdown);
+          onChangeRef.current(safe);
+          safeRaf(() => patchAllImages());
         });
-        crepeRef.current = crepe;
-        docKeyRef.current = docKey;
+      });
 
-        crepe.on((api) => {
-          api.markdownUpdated((_ctx, markdown) => {
-            if (isComposingRef.current) return;
-            const safe = normalizeMarkdownImageSources(markdown);
-            onChangeRef.current(safe);
-            requestAnimationFrame(() => patchAllImages());
-          });
-        });
+      crepe.create().then(() => {
+        if (cancelled || !isMountedRef.current || generationRef.current !== createGen) {
+          crepe.destroy();
+          return;
+        }
 
-        crepe.create().then(() => {
-          console.log("[PERF][WritingMode] create editor", (performance.now() - createStart).toFixed(1), "ms");
-          if (cancelled) { crepe.destroy(); return; }
-          crepe.setReadonly(false);
+        console.debug("[WRITING_LIFECYCLE] create done generation", createGen);
+        console.log("[PERF][WritingMode] create editor", (performance.now() - createStart).toFixed(1), "ms");
+        crepe.setReadonly(false);
 
-          requestAnimationFrame(() => patchAllImages());
-          requestAnimationFrame(() => {
+        safeRaf(() => patchAllImages());
+        safeRaf(() => {
+          if (isMountedRef.current && generationRef.current === createGen) {
             const editable = container.querySelector(".ProseMirror, [contenteditable='true']");
             if (editable instanceof HTMLElement) editable.focus();
-          });
+          }
         });
-      };
-
-      initEditor();
+      }).catch((err: unknown) => {
+        console.warn("[TyporaEditor] create failed", err);
+      });
 
       return () => {
         cancelled = true;
-        if (crepeRef.current) { crepeRef.current.destroy(); crepeRef.current = null; docKeyRef.current = null; }
+        if (crepeRef.current) {
+          crepeRef.current.destroy();
+          crepeRef.current = null;
+          docKeyRef.current = null;
+        }
+        console.debug("[WRITING_LIFECYCLE] cleanup generation", createGen);
       };
-    }, [currentPath]);
+    }, [currentPath, safeRaf, patchAllImages]);
 
     // ── 大纲跳转 ──
     useEffect(() => {

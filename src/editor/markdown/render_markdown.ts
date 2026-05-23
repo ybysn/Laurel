@@ -1,11 +1,13 @@
 /**
- * 模块职责：将 Markdown 文本渲染为 HTML，基于 markdown-it。
+ * 模块职责：将 Markdown 文本渲染为 HTML，基于 markdown-it + highlight.js。
  * 输入：Markdown 原始文本、可选 currentPath、可选 imageSrcMap。
  * 输出：HTML 字符串。
  * 图片路径转换：优先使用 imageSrcMap 中的 data URL，回退 convertFileSrc。
+ * 代码高亮：有语言标记时使用 highlight.js，无语言时不自动检测。
  */
 import MarkdownIt from "markdown-it";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import hljs from "highlight.js";
 import {
   safeDecodeMarkdownImageSrc,
   normalizeMarkdownImageSrc,
@@ -18,6 +20,33 @@ const md = new MarkdownIt({
 });
 
 const defaultImageRenderer = md.renderer.rules.image!.bind(md.renderer);
+
+// ── 代码块语法高亮 ──────────────────────────
+
+md.renderer.rules.fence = function (tokens, idx, _options, _env, _self) {
+  const token = tokens[idx];
+  const code = token.content;
+  const lang = token.info.trim();
+
+  // 无语言标记 → 仅 escape，不高亮
+  if (!lang) {
+    return `<pre><code>${md.utils.escapeHtml(code)}</code></pre>\n`;
+  }
+
+  // 有语言标记 → 尝试 highlight.js
+  const langLower = lang.toLowerCase();
+  try {
+    if (hljs.getLanguage(langLower)) {
+      const highlighted = hljs.highlight(code, { language: langLower, ignoreIllegals: true }).value;
+      return `<pre><code class="hljs language-${md.utils.escapeHtml(langLower)}">${highlighted}</code></pre>\n`;
+    }
+  } catch {
+    // highlight 失败 → fallback
+  }
+
+  // 不支持的语言 → escape + 标记语言 class
+  return `<pre><code class="language-${md.utils.escapeHtml(langLower)}">${md.utils.escapeHtml(code)}</code></pre>\n`;
+};
 
 function resolveAssetPath(markdownPath: string, imageSrc: string): string {
   const decoded = safeDecodeMarkdownImageSrc(imageSrc);

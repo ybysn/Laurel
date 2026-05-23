@@ -68,6 +68,26 @@ img { display: block; max-width: 100%; height: auto; margin: 16px 0; }
 hr { margin: 1em 0; border: none; border-top: 1px solid #e5e7eb; }
 strong { font-weight: 600; }
 em { font-style: italic; }
+
+/* 代码高亮 */
+.hljs-comment, .hljs-quote { color: #8a8fa0; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-type { color: #d73a49; }
+.hljs-string, .hljs-addition { color: #22863a; }
+.hljs-number, .hljs-literal { color: #005cc5; }
+.hljs-title, .hljs-section, .hljs-selector-id { color: #6f42c1; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable { color: #e36209; }
+.hljs-name, .hljs-built_in, .hljs-builtin-name { color: #005cc5; }
+.hljs-meta, .hljs-meta-keyword { color: #8a8fa0; }
+.hljs-symbol, .hljs-bullet, .hljs-link { color: #d73a49; }
+.hljs-deletion { color: #d73a49; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+.hljs-doctag, .hljs-formula { color: #6f42c1; }
+.hljs-params { color: #24292e; }
+.hljs-property { color: #005cc5; }
+.hljs-regexp { color: #22863a; }
+.hljs-selector-class, .hljs-selector-pseudo { color: #6f42c1; }
+.hljs-tag { color: #22863a; }
 `.trim();
 
 export async function exportMarkdownToHtml(
@@ -143,6 +163,25 @@ img { max-width: 100%; height: auto; display: block; margin: 12px 0; }
 a { color: #4a7cf7; }
 p { margin-bottom: 0.6em; }
 ul, ol { padding-left: 1.5em; }
+
+/* 代码高亮 */
+.hljs-comment, .hljs-quote { color: #6a6f7e; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-type { color: #b91c1c; }
+.hljs-string, .hljs-addition { color: #166534; }
+.hljs-number, .hljs-literal { color: #1e40af; }
+.hljs-title, .hljs-section, .hljs-selector-id { color: #5b21b6; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable { color: #9a3412; }
+.hljs-name, .hljs-built_in, .hljs-builtin-name { color: #1e40af; }
+.hljs-meta, .hljs-meta-keyword { color: #6a6f7e; }
+.hljs-symbol, .hljs-bullet, .hljs-link { color: #b91c1c; }
+.hljs-deletion { color: #b91c1c; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+.hljs-doctag, .hljs-formula { color: #5b21b6; }
+.hljs-property { color: #1e40af; }
+.hljs-regexp { color: #166534; }
+.hljs-selector-class, .hljs-selector-pseudo { color: #5b21b6; }
+.hljs-tag { color: #166534; }
 `.trim();
 
 export async function buildPrintableHtml(

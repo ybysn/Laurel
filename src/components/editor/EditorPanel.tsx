@@ -237,27 +237,33 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
     // 打开文件/新建文档后自动聚焦 textarea（仅源码/分屏模式）
     useEffect(() => {
       if (!isEditing) return;
-      if (viewMode === "wysiwyg") return;
+      if (viewMode === "wysiwyg") {
+        openEditableStartRef.current = null;
+        return;
+      }
 
       const textarea = textareaRef.current;
       if (!textarea) return;
 
+      const startAt = openEditableStartRef.current;
       const raf = requestAnimationFrame(() => {
         textarea.focus();
-        if (openEditableStartRef.current != null) {
-          console.log("[PERF] open file to editable", (performance.now() - openEditableStartRef.current).toFixed(1), "ms");
-          openEditableStartRef.current = null;
+        if (startAt != null) {
+          console.log("[PERF] open file to editable", (performance.now() - startAt).toFixed(1), "ms");
         }
+        openEditableStartRef.current = null;
       });
       return () => cancelAnimationFrame(raf);
     }, [fileName, currentPath, isEditing, viewMode]);
 
-    // 记录文件打开性能
+    // 记录文件打开性能（仅在源码/分屏模式需要聚焦时有效）
     useEffect(() => {
       if (isEditing) {
         openEditableStartRef.current = performance.now();
+      } else {
+        openEditableStartRef.current = null;
       }
-    }, [isEditing, fileName]);
+    }, [isEditing, fileName, currentPath]);
 
     // 清理状态定时器
     useEffect(() => {
