@@ -636,6 +636,67 @@ body {
   background-color: rgba(106, 140, 255, 0.08);
 }
 
+/* 写作模式用户自定义字体/字号覆盖 Milkdown Crepe 默认值 */
+.typora-editor .milkdown {
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+}
+
+.typora-editor .milkdown .ProseMirror {
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+}
+
+.typora-editor .milkdown .ProseMirror p {
+  font-size: var(--editor-font-size);
+}
+
+.typora-editor .milkdown .ProseMirror li {
+  font-size: var(--editor-font-size);
+}
+
+.typora-editor .milkdown .ProseMirror blockquote {
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+}
+
+.typora-editor .milkdown .ProseMirror td,
+.typora-editor .milkdown .ProseMirror th {
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+}
+
+.typora-editor .milkdown .ProseMirror h1 {
+  font-family: var(--editor-font-family);
+  font-size: calc(var(--editor-font-size, 16px) * 2.5);
+}
+
+.typora-editor .milkdown .ProseMirror h2 {
+  font-family: var(--editor-font-family);
+  font-size: calc(var(--editor-font-size, 16px) * 2);
+}
+
+.typora-editor .milkdown .ProseMirror h3 {
+  font-family: var(--editor-font-family);
+  font-size: calc(var(--editor-font-size, 16px) * 1.75);
+}
+
+.typora-editor .milkdown .ProseMirror h4 {
+  font-family: var(--editor-font-family);
+  font-size: calc(var(--editor-font-size, 16px) * 1.5);
+}
+
+.typora-editor .milkdown .ProseMirror h5 {
+  font-family: var(--editor-font-family);
+  font-size: calc(var(--editor-font-size, 16px) * 1.25);
+}
+
+.typora-editor .milkdown .ProseMirror h6 {
+  font-family: var(--editor-font-family);
+  font-size: calc(var(--editor-font-size, 16px) * 1.1);
+}
+
+
 /* 预览查找高亮 */
 .preview-find-match {
   background: rgba(255, 214, 102, 0.55);

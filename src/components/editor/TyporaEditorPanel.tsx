@@ -567,11 +567,22 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       return () => clearTimeout(timer);
     }, [scrollToHeadingText]);
 
+    const editorFontSizePx = `${fontSize}px`;
+
+    const editorStyle: React.CSSProperties = {
+      fontFamily,
+      fontSize: editorFontSizePx,
+      '--editor-font-family': fontFamily,
+      '--editor-font-size': editorFontSizePx,
+      '--crepe-font-default': fontFamily,
+      '--crepe-font-title': fontFamily,
+    } as React.CSSProperties;
+
     return (
       <div
         ref={containerRef}
         className={`typora-editor${isDragOver ? " typora-editor--drag-over" : ""}`}
-        style={{ fontFamily, fontSize: `${fontSize}px` }}
+        style={editorStyle}
       />
     );
   },
