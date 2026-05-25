@@ -147,6 +147,45 @@
 
 ---
 
+## 🧠 经验沉淀：写作模式接入后的多模式回归教训
+
+> 沉淀日期：2026-05-26
+
+**核心结论**：新增写作模式（WYSIWYG）不是普通 UI 改动，而是**新增一条完整的编辑器运行通道**。它与源码模式、分屏模式互不共享 DOM 和事件机制。
+
+### 三类回归教训
+
+| # | 事故 | 根因 | 教训 |
+|---|------|------|------|
+| 1 | 写作模式下 Ctrl+S/Ctrl+O/Ctrl+N 快捷键失效 | 全局快捷键在 `handleEditKeyDown` 中绑定在 `<textarea>` 上，写作模式无 textarea | 快捷键必须用 `window.addEventListener` capture 阶段全局注册 |
+| 2 | 写作模式下字体/字号设置不生效 | Milkdown Crepe `reset.css` 硬编码 `font-family` / `font-size`，特异性高于容器 inline style 继承 | CSS 层必须用 `.typora-editor .milkdown .ProseMirror`（4-class 特异性 0-4-0）覆盖 Crepe 默认值 |
+| 3 | 写作模式下图片路径写成 data URL | markdownUpdated 回调接收到的 Markdown 含 base64 data URL，需清洗 | 写作模式序列化路径必须加 `normalizeMarkdownImageSources` 清洗 |
+
+### 已验证的三模式回归矩阵（实测）
+
+| 改动类型 | 源码 | 写作 | 分屏 | 结论 |
+|----------|:---:|:---:|:---:|------|
+| 全局快捷键 | ✅ | ✅ | ✅ | capture-phase 全局监听，多模式安全 |
+| 打开/保存/另存为 | ✅ | ✅ | ✅ | 共享同一 Markdown content state |
+| 图片导入（拖拽/粘贴/按钮） | ✅ | ✅ | ✅ | 写作模式走 ProseMirror transaction，源码走 textarea |
+| 查找替换 | ✅ | ✅ | ✅ | 写作模式用 Decoration 插件，源码用 DOM selection |
+| 主题切换 | ✅ | ✅ | ✅ | CSS data-theme + CSS 变量驱动 |
+| 大纲点击跳转 | ✅ | ✅ | N/A | 写作模式 `scrollIntoView`，源码 line offset |
+| 字体/字号 | ✅ | ✅ | ✅ | 写作模式需额外 CSS 覆盖（本次修复） |
+| 导出 HTML/PDF | ✅ | ✅ | ✅ | 三模式读同一 content state |
+| 专注模式/全屏 | ✅ | ✅ | ✅ | 纯 CSS + window 操作 |
+
+### 工程规则升级
+
+已将上述教训写入 `AGENTS.md` 第 10 节「多编辑模式回归规则」，包括：
+
+- 三模式回归矩阵（表格式强制）
+- 写作模式专属禁止事项（5 条）
+- 写作模式 CSS 覆盖规范（4 条）
+- 验证检查清单（6 项）
+
+---
+
 ## 📋 下一步建议
 
 1. **优先**：搭建测试基础设施（`pnpm test` + 至少 1 个 round-trip 测试）
