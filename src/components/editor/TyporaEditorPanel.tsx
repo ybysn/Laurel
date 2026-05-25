@@ -469,6 +469,63 @@ export const TyporaEditorPanel = forwardRef<TyporaEditorPanelHandle, TyporaEdito
       };
     }, [handleCompositionStart, handleCompositionEnd]);
 
+    // ── Copy 按钮点击反馈 ──
+    useEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+
+      const timerMap = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
+
+      const onCopyClick = (e: Event) => {
+        const target = e.target as HTMLElement;
+        const button = target.closest('.tools-button-group button') as HTMLButtonElement | null;
+        if (!button) return;
+
+        // 保存原始完整 HTML（含 SVG 图标）
+        if (!button.dataset.originalHtml) {
+          button.dataset.originalHtml = button.innerHTML;
+        }
+
+        // 清除旧 timer
+        const oldTimer = timerMap.get(button);
+        if (oldTimer) clearTimeout(oldTimer);
+
+        // 清除残留状态
+        button.classList.remove('copied', 'failed');
+
+        // 延迟执行（让 Crepe clipboard 操作先完成）
+        setTimeout(() => {
+          if (!button.isConnected) return;
+
+          // 找到按钮内最后一个文本节点，替换为"已复制"
+          const childNodes = button.childNodes;
+          for (let i = childNodes.length - 1; i >= 0; i--) {
+            if (childNodes[i].nodeType === Node.TEXT_NODE) {
+              childNodes[i].textContent = '已复制';
+              break;
+            }
+          }
+          button.classList.add('copied');
+
+          const timer = setTimeout(() => {
+            if (button.isConnected) {
+              button.innerHTML = button.dataset.originalHtml!;
+              button.classList.remove('copied', 'failed');
+            }
+            timerMap.delete(button);
+          }, 1200);
+
+          timerMap.set(button, timer);
+        }, 50);
+      };
+
+      el.addEventListener('click', onCopyClick);
+
+      return () => {
+        el.removeEventListener('click', onCopyClick);
+      };
+    }, []);
+
     // ── RESOURCE_DEBUG ──
     useEffect(() => {
       const handler = (event: Event) => {

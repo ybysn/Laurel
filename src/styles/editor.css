@@ -603,3 +603,56 @@
   background: #4b5563 !important;
   color: #f9fafb;
 }
+
+/* Copy 按钮交互样式 */
+.typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button {
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button:active {
+  background: #d1d5db;
+}
+
+.typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button.copied,
+.typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button.failed {
+  width: auto !important;
+  height: auto !important;
+  min-width: unset !important;
+  max-width: unset !important;
+  padding: 4px 10px !important;
+  border-radius: 4px !important;
+}
+
+.typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button.copied {
+  background: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #a7f3d0 !important;
+}
+
+.typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button.failed {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+  border-color: #fecaca !important;
+}
+
+[data-theme="dark"] .typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button:hover {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button.copied {
+  background: #064e3b !important;
+  color: #a7f3d0 !important;
+  border-color: #065f46 !important;
+}
+
+[data-theme="dark"] .typora-editor .milkdown .milkdown-code-block .tools .tools-button-group button.failed {
+  background: #7f1d1d !important;
+  color: #fca5a5 !important;
+  border-color: #991b1b !important;
+}
