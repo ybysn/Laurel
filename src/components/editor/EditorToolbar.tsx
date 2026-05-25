@@ -37,6 +37,7 @@ export interface EditorToolbarProps {
   onPrint: () => void;
   applyCommand: (cmd: (content: string, start: number, end: number, ...args: any[]) => EditCommandResult, ...args: any[]) => void;
   onImageButtonClick: () => void;
+  currentTheme?: string;
 }
 
 const FONT_OPTIONS: { label: string; value: string }[] = [
@@ -86,6 +87,7 @@ export function EditorToolbar({
   onPrint,
   applyCommand,
   onImageButtonClick,
+  currentTheme = "light",
 }: EditorToolbarProps) {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -261,6 +263,19 @@ export function EditorToolbar({
                 <span className="editor-view-menu__shortcut">F11</span>
               </button>
             )}
+            <div className="editor-view-menu__sep" />
+            <button
+              className={`editor-view-menu__item ${currentTheme === "light" ? "editor-view-menu__item--active" : ""}`}
+              onClick={() => { onUpdateSettings({ theme: "light" }); setViewMenuOpen(false); }}
+            >
+              <span>浅色模式</span>
+            </button>
+            <button
+              className={`editor-view-menu__item ${currentTheme === "dark" ? "editor-view-menu__item--active" : ""}`}
+              onClick={() => { onUpdateSettings({ theme: "dark" }); setViewMenuOpen(false); }}
+            >
+              <span>深色模式</span>
+            </button>
           </div>
         )}
       </div>

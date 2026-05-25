@@ -796,6 +796,7 @@ export function AppShell() {
               onToggleFocus={toggleFocusMode}
               onToggleFullscreen={toggleFullscreen}
               isFullscreen={isFullscreen}
+              currentTheme={settings.theme}
               onExportHtml={handleExportHtml}
               onExportPdf={handleExportPdf}
               onPrint={handlePrint}

@@ -539,3 +539,27 @@
   outline: 2px dashed var(--color-accent);
   outline-offset: -2px;
 }
+
+/* 深色模式写作区 Milkdown Crepe 变量覆盖 */
+[data-theme="dark"] .typora-editor .milkdown {
+  --crepe-color-background: #1e1e2e;
+  --crepe-color-on-background: #e8e8f0;
+  --crepe-color-surface: #252536;
+  --crepe-color-surface-low: #2d2d42;
+  --crepe-color-on-surface: #e8e8f0;
+  --crepe-color-on-surface-variant: #b0b0c8;
+  --crepe-color-outline: #404060;
+  --crepe-color-primary: #6a8cff;
+  --crepe-color-secondary: #3a3a5c;
+  --crepe-color-on-secondary: #e8e8f0;
+  --crepe-color-inline-code: #ff7b7b;
+  --crepe-color-error: #ff7b7b;
+  --crepe-color-hover: #2d2d42;
+  --crepe-color-selected: #3a3a5c;
+  --crepe-color-inline-area: #2d2d42;
+}
+
+/* 深色模式编辑区背景 */
+[data-theme="dark"] .typora-editor {
+  background-color: #1e1e2e;
+}

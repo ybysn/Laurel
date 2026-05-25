@@ -51,7 +51,7 @@ export interface EditorPanelProps {
   onToggleSidebar: () => void;
   onToggleAutoSave: () => void;
   onOpenSettings: () => void;
-  onUpdateSettings: (partial: { editorFontSize?: number; editorFontFamily?: string }) => void;
+  onUpdateSettings: (partial: { editorFontSize?: number; editorFontFamily?: string; theme?: "light" | "dark" }) => void;
   onExportHtml: () => void;
   onExportPdf: () => void;
   onPrint: () => void;
@@ -59,6 +59,7 @@ export interface EditorPanelProps {
   onToggleFocus?: () => void;
   onToggleFullscreen?: () => void;
   isFullscreen?: boolean;
+  currentTheme?: string;
 }
 
 export interface EditorPanelHandle {
@@ -101,6 +102,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       onToggleFocus,
       onToggleFullscreen,
       isFullscreen = false,
+      currentTheme = "light",
     },
     ref,
   ) {
@@ -437,6 +439,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           onPrint={onPrint}
           applyCommand={applyCommand}
           onImageButtonClick={handleImageButtonClick}
+          currentTheme={currentTheme}
         />
 
         {/* 状态消息 */}
