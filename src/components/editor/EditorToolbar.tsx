@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { ViewMode } from "./EditorPanel";
 import type { TyporaEditorPanelHandle } from "./TyporaEditorPanel";
+import { SymbolInsertPanel } from "./SymbolInsertPanel";
 import {
   toggleBold,
   toggleItalic,
@@ -40,6 +41,7 @@ export interface EditorToolbarProps {
   currentTheme?: string;
   selectedHeadingLevel?: number;
   onHeadingChange?: (level: number) => void;
+  onInsertSymbol?: (symbol: string) => void;
 }
 
 const FONT_OPTIONS: { label: string; value: string }[] = [
@@ -91,10 +93,12 @@ export function EditorToolbar({
   currentTheme = "light",
   selectedHeadingLevel = 0,
   onHeadingChange,
+  onInsertSymbol,
 }: EditorToolbarProps) {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [insertMenuOpen, setInsertMenuOpen] = useState(false);
+  const [symbolPanelOpen, setSymbolPanelOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const viewMenuRef = useRef<HTMLDivElement>(null);
   const insertMenuRef = useRef<HTMLDivElement>(null);
@@ -209,9 +213,23 @@ export function EditorToolbar({
             >
               <span>图片</span>
             </button>
+            <button
+              className="editor-insert-menu__item"
+              onClick={() => { setSymbolPanelOpen((p) => !p); }}
+            >
+              <span>表情与符号</span>
+            </button>
           </div>
         )}
       </div>
+
+      {/* 符号面板 */}
+      {symbolPanelOpen && onInsertSymbol && (
+        <div className="symbol-panel-wrapper">
+          <div className="symbol-panel-overlay" onClick={() => setSymbolPanelOpen(false)} />
+          <SymbolInsertPanel onInsert={(s) => onInsertSymbol(s)} onClose={() => setSymbolPanelOpen(false)} />
+        </div>
+      )}
 
       {/* 视图菜单 */}
       <span className="editor-toolbar__sep" />
