@@ -61,11 +61,11 @@ export async function createFolder(path: string): Promise<void> {
 }
 
 /** 重命名文件或目录 */
-export async function renamePath(oldPath: string, newPath: string): Promise<void> {
-  return invoke<void>("rename_path", { oldPath, newPath });
+export async function renamePath(oldPath: string, newPath: string, workspaceRoot?: string): Promise<void> {
+  return invoke<void>("rename_path", { oldPath, newPath, workspaceRoot: workspaceRoot ?? null });
 }
 
 /** 删除文件或目录 */
-export async function deletePath(path: string): Promise<void> {
-  return invoke<void>("delete_path", { path });
+export async function deletePath(path: string, workspaceRoot?: string): Promise<void> {
+  return invoke<void>("delete_path", { path, workspaceRoot: workspaceRoot ?? null });
 }

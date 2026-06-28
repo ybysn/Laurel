@@ -480,7 +480,7 @@ export function AppShell() {
 
   const handleRenameItem = useCallback(async (oldPath: string, newPath: string) => {
     try {
-      await renamePath(oldPath, newPath);
+      await renamePath(oldPath, newPath, currentWorkspacePath ?? undefined);
       if (doc.currentPath === oldPath) {
         const name = newPath.split(/[\\/]/).pop() ?? "";
         setDoc((prev) => ({ ...prev, currentPath: newPath, fileName: name }));
@@ -490,13 +490,13 @@ export function AppShell() {
     } catch (err) {
       alert(`重命名失败: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [doc.currentPath, refreshWorkspaceTree]);
+  }, [doc.currentPath, refreshWorkspaceTree, currentWorkspacePath]);
 
   const handleDeleteItem = useCallback(async (path: string, _isDir: boolean) => {
     if (path === doc.currentPath && doc.isDirty) {
       const action = async () => {
         try {
-          await deletePath(path);
+          await deletePath(path, currentWorkspacePath ?? undefined);
           setDoc(createEmptyDocument());
           setRecentFiles((prev) => removeRecentFile(prev, path));
           await refreshWorkspaceTree();
@@ -509,7 +509,7 @@ export function AppShell() {
     }
 
     try {
-      await deletePath(path);
+      await deletePath(path, currentWorkspacePath ?? undefined);
       if (path === doc.currentPath) {
         setDoc(createEmptyDocument());
         setRecentFiles((prev) => removeRecentFile(prev, path));
