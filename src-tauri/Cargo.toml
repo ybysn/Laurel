@@ -5,7 +5,7 @@ description = "Laurel — 本地 Markdown 桌面编辑器 (Tauri 2 + Milkdown)"
 authors = ["ybysn <ybyxn7@gmail.com>"]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/ybysn/MLME"
+repository = "https://github.com/ybysn/Laurel"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

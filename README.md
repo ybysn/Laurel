@@ -4,71 +4,101 @@
 
 A local-first WYSIWYG Markdown editor built with Tauri 2 and Milkdown. Write, preview, and export — no cloud, no accounts, just your files.
 
-## 技术栈
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/ybysn/Laurel/actions/workflows/ci.yml/badge.svg)](https://github.com/ybysn/Laurel/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ybysn/Laurel)](https://github.com/ybysn/Laurel/releases)
 
-- **前端**: React 19 + TypeScript + Vite
-- **编辑器**: Milkdown Crepe（WYSIWYG 所见即所得）
-- **桌面框架**: Tauri 2 (Rust 后端)
-- **渲染**: markdown-it + highlight.js + KaTeX（数学公式）+ Mermaid（图表）
+## Why Laurel?
 
-## 前置环境
+Most Markdown editors are either Electron apps that eat RAM, or web-only tools that require an internet connection. **Laurel is different:** a lightweight, offline-first desktop app built on Tauri 2 — fast, private, and native on every platform.
 
-- **Node.js** >= 18（推荐 22 LTS）
-- **pnpm** >= 9
-- **Rust** (通过 [rustup](https://rustup.rs) 安装)
-- **系统依赖**：
-  - **Windows**: 无需额外依赖
-  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`
+- **Local-first** — your files stay on your disk, nothing leaves your machine
+- **WYSIWYG** — what you see is exactly what gets saved
+- **No accounts** — no sign-up, no cloud sync, no tracking
+- **Cross-platform** — single installer for Windows, macOS, and Linux
 
-## 功能
+## Highlights
 
-- 三种编辑视图：写作模式（WYSIWYG）/ 源码模式 / 分屏
-- Markdown 语法高亮、数学公式（KaTeX）、Mermaid 图表
-- 文件管理：新建/打开/保存，工作区（文件夹级别管理）
-- 自动保存（可配置延迟）
-- 图片插入（拖拽/粘贴/文件选择，自动管理 assets 目录）
-- 查找替换（支持大小写敏感）
-- 大纲导航
-- 导出 HTML / PDF / 打印
-- 专注模式 / 全屏
-- 命令面板 (Ctrl+Shift+P) / 快速打开 (Ctrl+P)
-- 亮/暗主题切换
-- 可配置字体、字号
+| Category | Details |
+|----------|---------|
+| ✍️ **Editor** | Milkdown Crepe — WYSIWYG with ProseMirror, three view modes (write / split / source) |
+| 📁 **Files** | Open any .md, workspace folder management, image asset auto-organization |
+| 🎨 **Rendering** | Code highlighting (highlight.js), math (KaTeX), diagrams (Mermaid) |
+| 🧭 **Navigation** | Outline sidebar, quick-open (Ctrl+P), command palette (Ctrl+Shift+P) |
+| 🌗 **Theme** | Light/dark mode, configurable fonts |
+| 📤 **Export** | HTML, PDF (via Chromium headless), print |
+| 🔒 **Safety** | Path sandbox — delete & rename restricted to workspace boundaries |
 
-## 开发
+## Quick Start
 
 ```bash
-# 安装依赖（需要 pnpm）
+# Prerequisites: Node.js >= 18, pnpm >= 9, Rust (rustup)
+# Linux only: sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
 pnpm install
-
-# 启动前端开发服务器
-pnpm dev
-
-# 构建前端
-pnpm build
-
-# 启动 Tauri 桌面应用
 pnpm tauri dev
-
-# 构建 Tauri 安装包
-pnpm tauri build
 ```
 
-## 快捷键
+## Tech Stack
 
-| 快捷键 | 功能 |
-|--------|------|
-| Ctrl+S | 保存 |
-| Ctrl+O | 打开文件 |
-| Ctrl+N | 新建文档 |
-| Ctrl+F | 查找 |
-| Ctrl+H | 替换 |
-| Ctrl+P | 快速打开 |
-| Ctrl+Shift+P | 命令面板 |
-| Ctrl+Alt+1 | 写作模式 |
-| Ctrl+Alt+2 | 分屏 |
-| Ctrl+Alt+3 | 源码视图 |
-| Ctrl+Alt+F | 专注模式 |
-| F11 | 全屏 |
-| Ctrl+\ | 切换侧边栏 |
+| Layer | Technology |
+|-------|-----------|
+| Desktop shell | Tauri 2 (Rust) |
+| Frontend | React 19 + TypeScript + Vite |
+| Editor engine | Milkdown Crepe (WYSIWYG) / ProseMirror |
+| Markdown | markdown-it, highlight.js, KaTeX, Mermaid |
+| Package manager | pnpm |
+
+## Features
+
+### Editing
+- Three views: WYSIWYG (writing mode), split (edit + preview), source (raw Markdown)
+- Full Markdown syntax support with live rendering
+- Math formulas (KaTeX) and Mermaid diagram rendering
+- Find & replace (case-sensitive)
+- Auto-save with configurable delay
+
+### File Management
+- Open / save / new Markdown files
+- Workspace mode: scan a folder, file tree sidebar
+- Image handling: drag-drop, paste, file pick → auto-copied to `.assets` folder
+- Recent files tracking
+
+### Workspace
+- File tree with create / rename / delete operations
+- Protection: blocks operations on `.git`, `node_modules`, system directories
+- Path sandbox: delete and rename enforced within workspace root
+
+### Export
+- HTML export (standalone, styled)
+- PDF export (Chromium headless, no print dialog)
+- Browser print support
+
+### UI/UX
+- Dark/light theme with Notion-inspired design tokens
+- Command palette (Ctrl+Shift+P)
+- Quick file open (Ctrl+P)
+- Focus mode / fullscreen
+- Outline sidebar with heading navigation
+
+## Project Status
+
+**v0.1.0 — First release**. Stable for daily writing. Actively maintained.
+
+- ✅ Core editing (WYSIWYG / split / source)
+- ✅ File open / save / manage workspace
+- ✅ Image assets
+- ✅ Outline navigation
+- ✅ HTML / PDF export
+- ✅ CI/CD pipeline
+- ✅ 126 tests
+
+See [open issues](https://github.com/ybysn/Laurel/issues) for planned features.
+
+## Keywords
+
+`markdown-editor` `wysiwyg` `tauri` `react` `desktop-app` `local-first` `markdown` `rust` `open-source` `milkdown`
+
+## License
+
+MIT © [ybysn](https://github.com/ybysn)
