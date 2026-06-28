@@ -1,6 +1,8 @@
-# MLME - Markdown Local Multi-platform Editor
+# Laurel — A Modern Markdown Editor for Desktop
 
-一个基于 Tauri 2 + React 19 + Milkdown 的本地 Markdown 编辑器，支持所见即所得（WYSIWYG）编辑、分屏预览、源码编辑三种模式。
+> 本地优先、所见即所得的 Markdown 桌面编辑器。基于 Tauri 2 + Milkdown 构建，支持 Windows / macOS / Linux。
+
+A local-first WYSIWYG Markdown editor built with Tauri 2 and Milkdown. Write, preview, and export — no cloud, no accounts, just your files.
 
 ## 技术栈
 
