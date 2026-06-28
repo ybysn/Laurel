@@ -108,6 +108,8 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
     ref,
   ) {
     const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+    const viewModeRef = useRef(viewMode);
+    viewModeRef.current = viewMode;
     const [selectedHeadingLevel, setSelectedHeadingLevel] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -115,6 +117,16 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
     const openEditableStartRef = useRef<number | null>(null);
 
     const typoraEditorRef = useRef<TyporaEditorPanelHandle>(null);
+
+    // Callback refs for global keyboard handler (WYSIWYG mode)
+    const onSaveRef = useRef(onSave);
+    onSaveRef.current = onSave;
+    const onOpenRef = useRef(onOpen);
+    onOpenRef.current = onOpen;
+    const onNewRef = useRef(onNew);
+    onNewRef.current = onNew;
+    const onToggleSidebarRef = useRef(onToggleSidebar);
+    onToggleSidebarRef.current = onToggleSidebar;
 
     // ── 撤销/重做栈（源码模式） ──
     const undoStackRef = useRef<string[]>([]);
@@ -286,13 +298,23 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
       },
     }));
 
-    // ── 全局快捷键：Ctrl+F/Ctrl+H/Ctrl+\（在所有模式下生效） ──
+    // ── 全局快捷键：Ctrl+F/Ctrl+H/Ctrl+\\（在所有模式下生效） ──
+    // 同时处理 WYSIWYG 模式下的 Ctrl+S/O/N（textarea 的 onKeyDown 不触发）
     useEffect(() => {
       const handler = (e: KeyboardEvent) => {
         if (e.isComposing || e.key === "Process") return;
         const ctrl = e.ctrlKey || e.metaKey;
         if (ctrl) {
           const k = e.key.toLowerCase();
+
+          // ── 全局文件操作（WYSIWYG/分屏模式下 textarea 无焦点，需在此处理） ──
+          const isMilkdownMode = viewModeRef.current === "wysiwyg" || viewModeRef.current === "split";
+          if (isMilkdownMode) {
+            if (k === "s") { e.preventDefault(); onSaveRef.current(); return; }
+            if (k === "o") { e.preventDefault(); onOpenRef.current(); return; }
+            if (k === "n") { e.preventDefault(); onNewRef.current(); return; }
+          }
+
           if (k === "f") {
             e.preventDefault();
             openFind(false);
@@ -305,7 +327,7 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           }
           if (k === "\\") {
             e.preventDefault();
-            onToggleSidebar();
+            onToggleSidebarRef.current();
           }
         }
       };
@@ -544,16 +566,20 @@ export const EditorPanel = forwardRef<EditorPanelHandle, EditorPanelProps>(
           </div>
         )}
 
-        {/* 分屏模式 */}
+        {/* 分屏模式：左侧 WYSIWYG，右侧预览 */}
         {viewMode === "split" && (
-          <div
-            className="panel__body panel__body--editor-split"
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
+          <div className="panel__body panel__body--editor-split">
             <div className="editor-split__pane editor-split__pane--edit">
-              {textareaElement}
+              <TyporaEditorPanel
+                ref={typoraEditorRef}
+                content={content}
+                currentPath={currentPath}
+                fontFamily={editorFontFamily}
+                fontSize={editorFontSize}
+                onChange={onContentChange}
+                scrollToHeadingText={outlineScrollTarget}
+                onStatusMessage={showStatus}
+              />
             </div>
             <div className="editor-split__divider" />
             <div className="editor-split__pane editor-split__pane--preview">

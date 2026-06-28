@@ -107,7 +107,7 @@ export function useImageInsert({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        if (viewMode === "wysiwyg") {
+        if (viewMode === "wysiwyg" || viewMode === "split") {
           void typoraEditorRef.current?.insertImageFiles(Array.from(files), "button");
         } else {
           handleInsertImageFiles(Array.from(files));

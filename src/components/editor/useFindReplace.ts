@@ -64,7 +64,7 @@ export function useFindReplace({
     const maxIdx = Math.max(0, matchesRef.current.length - 1);
     setActiveMatchIndex((prev) => Math.min(prev, maxIdx));
 
-    if (viewMode === "wysiwyg") {
+    if (viewMode === "wysiwyg" || viewMode === "split") {
       typoraEditorRef.current?.updateWritingFind(findQuery, caseSensitive, activeMatchIndex);
     }
   }, [findQuery, caseSensitive, content, viewMode, activeMatchIndex, typoraEditorRef]);
@@ -74,7 +74,7 @@ export function useFindReplace({
     let attempts = 0;
     const maxAttempts = 5;
     const tryHighlight = () => {
-      if (!isFindOpen || viewMode !== "wysiwyg" || !findQuery) return;
+      if (!isFindOpen || (viewMode !== "wysiwyg" && viewMode !== "split") || !findQuery) return;
       typoraEditorRef.current?.updateWritingFind(findQuery, caseSensitive, activeMatchIndex);
       if (attempts < maxAttempts) {
         attempts++;
@@ -90,9 +90,9 @@ export function useFindReplace({
   useEffect(() => {
     updateFindMatches();
     setActiveMatchIndex(0);
-    if (viewMode === "wysiwyg" && findQuery) {
+    if (viewMode === "wysiwyg" || viewMode === "split") {
       typoraEditorRef.current?.updateWritingFind(findQuery, caseSensitive, 0);
-    } else if (viewMode === "wysiwyg") {
+    } else if (viewMode === "wysiwyg" || viewMode === "split") {
       typoraEditorRef.current?.updateWritingFind('', false, 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,7 +113,7 @@ export function useFindReplace({
 
     setActiveMatchIndex(idx);
 
-    if (viewMode === "wysiwyg") {
+    if (viewMode === "wysiwyg" || viewMode === "split") {
       typoraEditorRef.current?.scrollToWritingFindMatch(idx);
       return;
     }
@@ -153,11 +153,11 @@ export function useFindReplace({
     const m = matches[idx];
     const result = replaceCurrentMatch(content, m, replaceText);
     onContentChange(result.content);
-    if (viewMode === "wysiwyg") {
+    if (viewMode === "wysiwyg" || viewMode === "split") {
       typoraEditorRef.current?.refreshContent(result.content);
       scheduleWritingFindHighlight();
     }
-    if (viewMode !== "wysiwyg") {
+    if (viewMode !== "wysiwyg" && viewMode !== "split") {
       setTimeout(() => {
         updateFindMatches();
         const textarea = textareaRef.current;
@@ -174,7 +174,7 @@ export function useFindReplace({
     const result = replaceAllMatches(content, findQuery, replaceText, { caseSensitive });
     if (result.count > 0) {
       onContentChange(result.content);
-      if (viewMode === "wysiwyg") {
+      if (viewMode === "wysiwyg" || viewMode === "split") {
         typoraEditorRef.current?.refreshContent(result.content);
         scheduleWritingFindHighlight();
       }
@@ -190,7 +190,7 @@ export function useFindReplace({
     setIsFindOpen(true);
     setIsReplaceMode(replace ?? false);
 
-    if (viewMode === "wysiwyg") {
+    if (viewMode === "wysiwyg" || viewMode === "split") {
       const selected = typoraEditorRef.current?.getSelectedText();
       if (selected) { setFindQuery(selected); return; }
     } else {
