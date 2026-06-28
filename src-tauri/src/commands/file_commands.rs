@@ -404,12 +404,16 @@ pub fn create_folder(path: String) -> Result<(), String> {
 
 /// 重命名文件或目录。
 #[tauri::command]
-pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
+pub fn rename_path(old_path: String, new_path: String, workspace_root: Option<String>) -> Result<(), String> {
     let old = Path::new(&old_path);
     let new = Path::new(&new_path);
     validate_path_safe(old)?;
     validate_path_safe(new)?;
 
+    if let Some(ref root) = workspace_root {
+        validate_within_workspace(old, root)?;
+        validate_within_workspace(new, root)?;
+    }
     if !old.exists() {
         return Err(format!("路径不存在: {}", old_path));
     }
@@ -423,14 +427,39 @@ pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// canonicalize 后校验目标路径在工作区根目录内。
+fn validate_within_workspace(target: &Path, workspace_root: &str) -> Result<(), String> {
+    let root = Path::new(workspace_root)
+        .canonicalize()
+        .map_err(|e| format!("workspace path invalid: {}", e))?;
+    let resolved = if target.exists() {
+        target.canonicalize().map_err(|e| format!("path resolve failed: {}", e))?
+    } else {
+        let parent = target.parent().unwrap_or(target);
+        let parent_resolved = parent.canonicalize()
+            .map_err(|e| format!("parent resolve failed: {}", e))?;
+        if !parent_resolved.starts_with(&root) {
+            return Err(format!("path outside workspace: {}", target.to_string_lossy()));
+        }
+        return Ok(());
+    };
+    if !resolved.starts_with(&root) {
+        return Err(format!("path outside workspace: {}", target.to_string_lossy()));
+    }
+    Ok(())
+}
+
 const PROTECTED_DIRS: &[&str] = &[".git", "node_modules", "target", "dist", "build"];
 
 /// 删除文件或目录。
 #[tauri::command]
-pub fn delete_path(path: String) -> Result<(), String> {
+pub fn delete_path(path: String, workspace_root: Option<String>) -> Result<(), String> {
     let path_buf = Path::new(&path);
     validate_path_safe(path_buf)?;
 
+    if let Some(ref root) = workspace_root {
+        validate_within_workspace(path_buf, root)?;
+    }
     if !path_buf.exists() {
         return Err(format!("路径不存在: {}", path));
     }
