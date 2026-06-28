@@ -64,6 +64,11 @@ const md = new MarkdownIt({
   breaks: true,
 });
 
+// ── 预处理：兼容无空格标题语法（#标题 → # 标题） ──
+function preprocessHeadings(markdown: string): string {
+  return markdown.replace(/^(#{1,6})([^\s#])/gm, "$1 $2");
+}
+
 // ── KaTeX 数学公式 ──
 md.use(mk, { throwOnError: false, errorColor: "#d73a49" });
 
@@ -205,5 +210,5 @@ export function renderMarkdownToHtml(
       keys: Object.keys(imageSrcMap),
     });
   }
-  return md.render(content, env);
+  return md.render(preprocessHeadings(content), env);
 }
