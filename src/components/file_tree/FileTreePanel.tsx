@@ -165,7 +165,6 @@ export function FileTreePanel({
 
   return (
     <div className="panel panel--file-tree">
-      <header className="panel__header"><h2 className="panel__title">文件</h2></header>
       <div className="panel__body">
         <div className="file-tree-actions">
           <button className="file-tree-actions__btn" onClick={onNew}>新建</button>
@@ -178,10 +177,7 @@ export function FileTreePanel({
 
         {isEditing && (
           <div className="file-tree-file-info">
-            <span className="file-tree-file-info__name">{fileName}</span>
-            <span className={`file-tree-file-info__status ${isDirty ? "file-tree-file-info__status--dirty" : "file-tree-file-info__status--clean"}`}>
-              {isDirty ? "未保存" : "已保存"}
-            </span>
+            <span className="file-tree-file-info__name" title={currentPath ?? undefined}>{fileName}</span>
           </div>
         )}
 

@@ -203,7 +203,7 @@ export function EditorToolbar({
           title="插入"
           onClick={() => setInsertMenuOpen((p) => !p)}
         >
-          插入 &#9660;
+          &#128206; 插入
         </button>
         {insertMenuOpen && (
           <div className="editor-insert-menu__dropdown">
@@ -239,7 +239,7 @@ export function EditorToolbar({
           title="视图"
           onClick={() => setViewMenuOpen((p) => !p)}
         >
-          视图 &#9660;
+          &#128065; 视图
         </button>
         {viewMenuOpen && (
           <div className="editor-view-menu__dropdown">
@@ -308,7 +308,7 @@ export function EditorToolbar({
           title="导出"
           onClick={() => setExportMenuOpen((p) => !p)}
         >
-          导出 &#9660;
+          &#128229; 导出
         </button>
         {exportMenuOpen && (
           <div className="editor-export-menu__dropdown">

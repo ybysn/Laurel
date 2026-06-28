@@ -307,6 +307,9 @@
 
 .editor-textarea::placeholder {
   color: var(--color-text-placeholder);
+  font-family: var(--font-family);
+  font-style: italic;
+  opacity: 0.6;
 }
 
 .editor-textarea--split {
